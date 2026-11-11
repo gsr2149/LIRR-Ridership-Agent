@@ -30,7 +30,11 @@ _client: genai.Client | None = None
 def client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client()  # reads GEMINI_API_KEY from the environment
+        # Reads GEMINI_API_KEY from the environment. Tool calling needs the
+        # v1beta API; newer SDK versions default to v1, which rejects tools.
+        _client = genai.Client(
+            http_options=types.HttpOptions(api_version=os.environ.get("GEMINI_API_VERSION", "v1beta"))
+        )
     return _client
 
 
