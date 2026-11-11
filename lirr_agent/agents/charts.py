@@ -19,6 +19,7 @@ MAX_POINTS = 60
 MAX_SERIES = 8
 DATE_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?")
 NOT_A_MEASURE = re.compile(r"(^|_)(days?|n_days|days_count|num_days|rank|zone|id|year|month)($|_)", re.I)
+DELTA = re.compile(r"change|diff|delta|growth|increase|decrease|_pp$|^pp_", re.I)
 PREFERRED = re.compile(r"share|pct|percent|rate|occupancy|spend|usd|riders|ridership|tickets|count|total", re.I)
 
 
@@ -42,8 +43,11 @@ def chart_from_query(q: dict) -> dict | None:
     if not numeric or not text:
         return None
     # Prefer a meaningful measure (share, spend, tickets...) and the last such column.
+    levels = [i for i in numeric if not DELTA.search(cols[i])]  # levels chart better than deltas
+    numeric = levels or numeric
     preferred = [i for i in numeric if PREFERRED.search(cols[i])]
-    y = (preferred or numeric)[-1]
+    shares = [i for i in preferred if re.search(r"share|pct|percent", cols[i], re.I)]
+    y = (shares or preferred or numeric)[-1]
     x = text[0]
     is_time = bool(all(DATE_RE.match(str(r[x])) for r in rows if r[x] is not None)
                    or re.search(r"date|month|week|year", cols[x], re.I))
@@ -64,7 +68,9 @@ def chart_from_query(q: dict) -> dict | None:
         if len(labels) > MAX_POINTS:
             return None
         top = max(abs(r[y]) for r in rows if _is_num(r[y])) or 1
-        ys = [i for i in numeric
+        same_kind = [i for i in numeric if bool(re.search(r"share|pct|percent", cols[i], re.I))
+                     == bool(re.search(r"share|pct|percent", cols[y], re.I))]
+        ys = [i for i in same_kind
               if (m := max((abs(r[i]) for r in rows if _is_num(r[i])), default=0)) and 0.05 <= m / top <= 20]
         ys = ys[:4] or [y]
         series = [{"name": cols[i], "values": [r[i] for r in rows]} for i in ys]

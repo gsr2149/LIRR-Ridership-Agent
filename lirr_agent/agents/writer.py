@@ -121,7 +121,7 @@ def sources_section(cited: list[str], findings: list[Finding], fares_cited: set[
                     connection().cursor().execute("SELECT table_name, title, url FROM sources").fetchall()}
     except Exception:
         datasets = {}
-    lines = ["", "---", "**Sources**"]
+    lines = ["", "", "---", "**Sources**"]  # blank line first, or Markdown reads --- as a heading underline
     for qid in cited:
         q = by_id[qid]
         tables = ", ".join(
@@ -137,7 +137,7 @@ def sources_section(cited: list[str], findings: list[Finding], fares_cited: set[
     if background_cited:
         lines.append(f"- [{BACKGROUND_CITATION}] MTA fare and ticketing changes effective January 4, 2026 "
                      "(background, not from the datasets)")
-    return "\n".join(lines) if len(lines) > 3 else ""
+    return "\n".join(lines) if len(lines) > 4 else ""
 
 
 def write(question: str, findings: list[Finding]) -> tuple[str, list[dict]]:

@@ -30,3 +30,10 @@ def test_charts_follow_citation_order():
     f = Finding("R1", "researcher-1", "q", "s", calls)
     specs = charts_for_answer("x [q_33333333] y [q_11111111] z [q_22222222]", [f])
     assert [s["query_id"] for s in specs] == ["q_33333333", "q_11111111"]
+
+
+def test_wide_charts_skip_change_columns_and_mixed_units():
+    spec = chart_from_query(q(["sold_as", "share_pre", "share_post", "pct_volume_change", "tickets_post"], [
+        ["one_way", 77.2, 92.2, 16.1, 31258499], ["round_trip", 14.1, 0.01, -99.9, 3946],
+        ["day_pass", 0.0, 5.9, None, 2000652]]))
+    assert [s["name"] for s in spec["series"]] == ["share_pre", "share_post"]

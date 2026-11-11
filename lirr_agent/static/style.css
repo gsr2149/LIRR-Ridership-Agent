@@ -1,0 +1,230 @@
+:root {
+  --bg: #f3efe6;            /* ticket paper */
+  --card: #fffdf8;
+  --ink: #1b1f24;
+  --muted: #5d6570;
+  --line: #ded7c8;
+  --board: #13171d;          /* departure board */
+  --board-ink: #f4f1ea;
+  --amber: #f2b33d;
+  --accent: #1d5fc2;         /* rail blue */
+  --accent-soft: #e6eefb;
+  --ok: #2d7a4c;
+  --ok-soft: #e4f3ea;
+  --warn: #b3541e;
+  --warn-soft: #fbeadf;
+  --code: #f1ece1;
+  --shadow: 0 1px 0 rgba(0,0,0,.04), 0 6px 20px rgba(40,30,10,.06);
+  --c1: #1d5fc2; --c2: #e0892b; --c3: #2d7a4c; --c4: #9b3fb5; --c5: #c23a3a; --c6: #5b6b7d;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --card: #171b21; --ink: #ebe8e1; --muted: #9aa3ae; --line: #2a3038;
+    --board: #090b0e; --accent: #6ea2f0; --accent-soft: #1b2a40; --ok: #5fc08a; --ok-soft: #16281e;
+    --warn: #ef9a62; --warn-soft: #2e1e14; --code: #1f242b; --shadow: none;
+    --c1: #6ea2f0; --c2: #f0a65a; --c3: #5fc08a; --c4: #c587d8; --c5: #ee7b7b; --c6: #9fb0c2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --card: #171b21; --ink: #ebe8e1; --muted: #9aa3ae; --line: #2a3038;
+  --board: #090b0e; --accent: #6ea2f0; --accent-soft: #1b2a40; --ok: #5fc08a; --ok-soft: #16281e;
+  --warn: #ef9a62; --warn-soft: #2e1e14; --code: #1f242b; --shadow: none;
+  --c1: #6ea2f0; --c2: #f0a65a; --c3: #5fc08a; --c4: #c587d8; --c5: #ee7b7b; --c6: #9fb0c2;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.55 "Overpass", system-ui, sans-serif;
+}
+a { color: var(--accent); }
+code, pre, .mono { font-family: "Overpass Mono", ui-monospace, monospace; }
+.small { font-size: .86rem; color: var(--muted); }
+button { font: inherit; }
+
+/* ---------- departure board header ---------- */
+.board { background: var(--board); color: var(--board-ink); border-bottom: 6px solid var(--amber); }
+.board-inner { max-width: 1060px; margin: 0 auto; padding: 22px 16px 18px; }
+.board-row { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: space-between;
+  font: 600 .78rem/1.4 "Overpass Mono", monospace; letter-spacing: .08em; color: #b9b3a6; }
+.board-clock { color: var(--amber); }
+.flap { margin: 18px 0 10px; font: 800 clamp(2.1rem, 7vw, 4.4rem)/1 "Overpass Mono", monospace;
+  letter-spacing: .02em; color: var(--amber); display: flex; flex-wrap: wrap; gap: .1em .35em; }
+.flap span { display: inline-block; padding: .08em .14em; background: #1d232b; border-radius: 4px;
+  box-shadow: inset 0 -.5em 0 rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.04);
+  animation: flip .6s cubic-bezier(.3,1.4,.5,1) both; }
+.flap span:nth-child(2) { animation-delay: .12s; } .flap span:nth-child(3) { animation-delay: .24s; }
+@keyframes flip { from { transform: rotateX(80deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .flap span { animation: none; } }
+.board-lede { max-width: 760px; margin: 6px 0 18px; font-size: 1.05rem; color: #ddd8cd; }
+.board-lede strong { color: #fff; }
+.board-status a { color: var(--amber); text-decoration: none; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.dot.ok { background: #5fc08a; box-shadow: 0 0 0 3px rgba(95,192,138,.2); }
+
+main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid; gap: 22px; }
+
+/* ---------- ticket stubs ---------- */
+.stubs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.stub { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
+  position: relative; box-shadow: var(--shadow); }
+.stub::before { content: ""; position: absolute; left: 0; right: 0; top: 44px; border-top: 2px dashed var(--line); }
+.stub h2 { margin: 0 0 18px; font: 600 .82rem/1.2 "Overpass Mono", monospace; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent); }
+.stub p, .stub ul, .stub ol { margin: 0 0 8px; font-size: .94rem; }
+.stub ul, .stub ol { padding-left: 1.1em; }
+.stub li { margin-bottom: 4px; }
+.cite-demo { font: 600 .78rem "Overpass Mono", monospace; background: var(--accent-soft); color: var(--accent);
+  padding: 1px 6px; border-radius: 999px; }
+
+/* ---------- cards ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
+.card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 12px; }
+.card-head h2 { margin: 0; font-size: 1.35rem; font-weight: 800; }
+.card-head p { margin: 0; }
+.btn { border: 0; border-radius: 8px; padding: .62em 1.1em; background: var(--accent); color: #fff;
+  font-weight: 600; cursor: pointer; }
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .55; cursor: wait; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+
+/* ---------- commute ---------- */
+.commute-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.commute-form label { display: grid; gap: 4px; font: 600 .78rem "Overpass Mono", monospace; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); flex: 1 1 200px; }
+.commute-form input, .ask-form textarea {
+  font: 1rem "Overpass", sans-serif; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: .6em .75em; width: 100%; }
+.commute-form input:focus, .ask-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.commute-form .arrow { padding-bottom: .55em; color: var(--muted); }
+#commute-result { margin-top: 14px; }
+.fare-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin-bottom: 8px; }
+.fare-head b { font-size: 1.05rem; }
+.zone-tag { font: 600 .74rem "Overpass Mono", monospace; background: var(--board); color: var(--amber);
+  border-radius: 4px; padding: 2px 6px; }
+.fares { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.fares th { text-align: left; font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 2px solid var(--line); padding: 6px 8px; }
+.fares td { border-bottom: 1px solid var(--line); padding: 7px 8px; }
+.fares td.num, .fares th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-block; font: 600 .72rem "Overpass Mono", monospace; padding: 1px 7px; border-radius: 999px; }
+.pill.up { background: var(--warn-soft); color: var(--warn); }
+.pill.down { background: var(--ok-soft); color: var(--ok); }
+.pill.gone { background: var(--code); color: var(--muted); text-decoration: line-through; }
+.pill.new { background: var(--accent-soft); color: var(--accent); }
+.fare-notes { margin: 8px 0 0; padding-left: 1.1em; }
+.fare-ask { margin-top: 10px; }
+
+/* ---------- ask ---------- */
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.examples button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px;
+  padding: .38em .9em; cursor: pointer; font-size: .9rem; }
+.examples button:hover { border-color: var(--accent); color: var(--accent); }
+.examples button.vague { font-style: italic; }
+.ask-form { display: flex; gap: 10px; align-items: stretch; margin-top: 12px; }
+.ask-form textarea { resize: vertical; min-height: 3em; }
+.thread { display: grid; gap: 16px; }
+.thread:empty { display: none; }
+
+.turn { border-top: 1px dashed var(--line); padding-top: 14px; }
+.turn:first-child { border-top: 0; padding-top: 0; }
+.you { margin: 0 0 10px; font-weight: 800; font-size: 1.08rem; }
+.you::before { content: "Q  "; font: 600 .8rem "Overpass Mono", monospace; color: var(--amber);
+  background: var(--board); border-radius: 4px; padding: 1px 6px; margin-right: 8px; vertical-align: 2px; }
+
+/* live research board */
+.live { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.rail { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr);
+  position: relative; font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; }
+.rail::before { content: ""; position: absolute; left: 12%; right: 12%; top: 8px; height: 3px; background: var(--line); }
+.rail li { position: relative; text-align: center; padding-top: 22px; color: var(--muted); }
+.rail li::before { content: ""; position: absolute; top: 2px; left: 50%; width: 15px; height: 15px; margin-left: -7.5px;
+  border-radius: 50%; background: var(--card); border: 3px solid var(--line); box-sizing: border-box; }
+.rail li.done { color: var(--ink); }
+.rail li.done::before { background: var(--accent); border-color: var(--accent); }
+.rail li.now { color: var(--accent); }
+.rail li.now::before { border-color: var(--accent); background: var(--amber); animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(242,179,61,.25); } }
+.live-status { margin: 0 0 10px; font-size: .92rem; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.elapsed { margin-left: auto; font: 600 .8rem "Overpass Mono", monospace; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.live.finished .spinner { display: none; }
+.lanes { display: grid; gap: 10px; }
+.lane { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--c6); border-radius: 8px; padding: 9px 11px; min-width: 0; }
+.lane.lead { border-left-color: var(--amber); }
+.lane.writer { border-left-color: var(--c3); }
+.lane.researcher { border-left-color: var(--accent); }
+.lane-head { display: flex; gap: 8px; align-items: baseline; font: 600 .76rem "Overpass Mono", monospace;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.lane-head .state { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.lane .subq { margin: 4px 0 6px; font-weight: 600; font-size: .95rem; }
+.researchers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .86rem; }
+.steps li { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.steps li .tag { font: 600 .7rem "Overpass Mono", monospace; color: var(--accent); flex: none; }
+.steps li .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.steps li.err .tag, .steps li.err .what { color: var(--warn); }
+.summary { margin: 6px 0 0; font-size: .86rem; color: var(--muted); }
+.plan-list { margin: 4px 0 0; padding-left: 1.2em; font-size: .9rem; }
+
+/* answer */
+.answer { margin-top: 12px; }
+.answer-body { font-size: 1.02rem; overflow-wrap: anywhere; }
+.answer-body h3 { font-size: 1.05rem; margin: 1.1em 0 .3em; }
+.answer-body hr { border: 0; border-top: 1px dashed var(--line); margin: 1.2em 0 .6em; }
+.answer-body ul { padding-left: 1.2em; }
+.answer-body li { margin-bottom: .35em; }
+.answer.clarify .answer-body, .answer.scope .answer-body { border-left: 4px solid var(--amber); padding: 4px 0 4px 12px; }
+.answer-kind { font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--warn); }
+a.cite { font: 600 .74rem "Overpass Mono", monospace; text-decoration: none; background: var(--accent-soft);
+  color: var(--accent); padding: 1px 6px; border-radius: 999px; white-space: nowrap; }
+a.cite.fare { background: var(--ok-soft); color: var(--ok); }
+a.cite.bg { background: var(--code); color: var(--muted); }
+.checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.badge { font: 600 .78rem "Overpass Mono", monospace; border-radius: 6px; padding: 4px 9px; border: 1px solid var(--line); }
+.badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+.badge.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 12px 0; }
+.chart { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
+.chart h4 { margin: 0 0 6px; font-size: .85rem; font-weight: 600; }
+.chart .box { position: relative; height: 230px; }
+
+/* trace */
+details.trace { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+details.trace > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
+.trace-body { padding: 0 12px 12px; display: grid; gap: 12px; }
+.trace-agent h4 { margin: 6px 0; font: 600 .78rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.qcard { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; min-width: 0; }
+.qcard.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--amber); } 100% { box-shadow: none; } }
+.qcard-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: .86rem; }
+.qcard-head code { font-weight: 600; color: var(--accent); }
+.qcard pre { margin: 6px 0; padding: 8px; background: var(--code); border-radius: 6px; font-size: .78rem;
+  white-space: pre-wrap; word-break: break-word; }
+.rows-wrap { overflow-x: auto; max-width: 100%; }
+table.rows { border-collapse: collapse; font-size: .78rem; font-variant-numeric: tabular-nums; }
+table.rows th, table.rows td { border: 1px solid var(--line); padding: 3px 6px; text-align: left; white-space: nowrap; }
+table.rows th { background: var(--code); }
+.error-box { color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 10px 12px; }
+
+/* footer */
+.foot { max-width: 1060px; margin: 10px auto 30px; padding: 18px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  font-size: .9rem; color: var(--muted); border-top: 1px solid var(--line); }
+.foot h3 { margin: 0 0 6px; font: 600 .78rem "Overpass Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.foot ul { margin: 0; padding-left: 1.1em; }
+
+@media (max-width: 760px) {
+  .stubs, .foot { grid-template-columns: 1fr; }
+  .ask-form { flex-direction: column; }
+  .commute-form .arrow { display: none; }
+  .commute-form .btn { width: 100%; }
+  .rail { font-size: .66rem; }
+  .fares { font-size: .86rem; }
+  .fares td, .fares th { padding: 6px 4px; }
+}

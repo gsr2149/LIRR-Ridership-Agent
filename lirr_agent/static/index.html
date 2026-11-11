@@ -3,56 +3,140 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LIRR Fare Agent</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; background: #fff; color: #111; }
-    .msg { margin: .75rem 0; white-space: pre-wrap; }
-    .you { font-weight: 600; }
-    details { font-size: .8rem; color: #555; margin: .25rem 0; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #f5f5f5; padding: .5rem; }
-    form { display: flex; gap: .5rem; margin-top: 1rem; }
-    input { flex: 1; padding: .5rem; font-size: 1rem; }
-  </style>
+  <title>After the Ten-Trip · LIRR fare research</title>
+  <meta name="description" content="An AI research team that digs through LIRR ticket sales, ridership, train crowding and fare charts to explain what the January 2026 fare change did to riders.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <h1>LIRR Fare Change Agent</h1>
-  <p>Temporary test page (milestone 3). The real front end comes in milestone 6.</p>
-  <div id="log"></div>
-  <form id="f">
-    <input id="q" placeholder="e.g. How did ten-trip and day pass sales change after January 2026?" autocomplete="off">
-    <button>Ask</button>
-  </form>
-<script>
-let sessionId = null;
-const log = document.getElementById("log");
-function add(cls, text) {
-  const div = document.createElement("div");
-  div.className = "msg " + cls;
-  div.textContent = text;
-  log.appendChild(div);
-}
-document.getElementById("f").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const input = document.getElementById("q");
-  const message = input.value.trim();
-  if (!message) return;
-  input.value = "";
-  add("you", message);
-  add("bot", "Working...");
-  const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, session_id: sessionId }) });
-  log.lastChild.remove();
-  const data = await res.json();
-  if (!res.ok) { add("bot", "Error: " + (data.detail || res.status)); return; }
-  sessionId = data.session_id;
-  for (const t of data.tool_calls) {
-    const d = document.createElement("details");
-    d.innerHTML = `<summary>🔧 [${t.agent}] ${t.name}</summary><pre></pre>`;
-    d.querySelector("pre").textContent = JSON.stringify({ args: t.args, result: t.result }, null, 2);
-    log.appendChild(d);
-  }
-  add("bot", data.response);
-});
-</script>
+  <header class="board">
+    <div class="board-inner">
+      <div class="board-row board-meta">
+        <span>LIRR · FARE CHANGE OF JAN 4 2026</span>
+        <span class="board-clock" id="clock">--:--</span>
+      </div>
+      <h1 class="flap" aria-label="After the Ten-Trip">
+        <span>AFTER</span> <span>THE</span> <span>TEN-TRIP</span>
+      </h1>
+      <p class="board-lede">
+        On January 4, 2026 the Long Island Rail Road raised fares, retired the ten-trip ticket and
+        swapped round trips for a Day Pass. Ask a question and a small team of AI researchers digs
+        through 17 million rows of ticket sales, daily ridership, train crowding counts and both fare
+        charts to find out <strong>what riders bought instead, and what they pay now</strong>.
+      </p>
+      <div class="board-row board-status">
+        <span><i class="dot ok"></i>Researchers on duty</span>
+        <span>Data through Sep 30 2026</span>
+        <a href="#about">How it works ↓</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="stubs" id="about" aria-label="About this agent">
+      <article class="stub">
+        <h2>Who it's for</h2>
+        <p>LIRR riders wondering what to buy now that the ten-trip is gone, transit advocates and
+        reporters checking the MTA's numbers, and anyone curious how a fare change ripples through a
+        commuter railroad.</p>
+      </article>
+      <article class="stub">
+        <h2>How to use it</h2>
+        <ol>
+          <li>Ask in plain English, or tap an example.</li>
+          <li>Watch the <b>Lead</b> plan, 2–4 <b>Researchers</b> query the data in parallel, and the <b>Writer</b> report.</li>
+          <li>Tap any citation like <span class="cite-demo">q_1a2b3c4d</span> to see the exact SQL and rows behind a number.</li>
+        </ol>
+        <p class="small">Answers take about 20–60 seconds. Vague questions get a clarifying question back.</p>
+      </article>
+      <article class="stub">
+        <h2>What it can't tell you</h2>
+        <ul>
+          <li>Ticket <b>counts</b>, not revenue: spending is an estimate (tickets × fare chart prices).</li>
+          <li>A ten-trip counts as 10 tickets in the MTA data, and round trips mostly count per leg.</li>
+          <li>Prices from the Aug 2023 and Jan 2026 charts only; crowding covers M7/M9 electric trains only.</li>
+          <li>Sales and crowding cover Jan 2025 – Sep 2026.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card commute" aria-labelledby="commute-title">
+      <div class="card-head">
+        <h2 id="commute-title">Check your commute</h2>
+        <p class="small">Instant, straight from the two fare charts (no AI involved).</p>
+      </div>
+      <form id="commute-form" class="commute-form" autocomplete="off">
+        <label>From <input id="from" list="stations" placeholder="Penn Station" required></label>
+        <span class="arrow" aria-hidden="true">⇄</span>
+        <label>To <input id="to" list="stations" placeholder="Hicksville" required></label>
+        <button type="submit" class="btn">Compare fares</button>
+        <datalist id="stations"></datalist>
+      </form>
+      <div id="commute-result" aria-live="polite"></div>
+    </section>
+
+    <section class="card ask" aria-labelledby="ask-title">
+      <div class="card-head">
+        <h2 id="ask-title">Ask the research desk</h2>
+        <button type="button" class="btn ghost" id="new-chat" hidden>New conversation</button>
+      </div>
+      <div class="examples" id="examples" aria-label="Example questions">
+        <button type="button" data-q="What did riders buy instead of ten-trip and round-trip tickets?">What replaced the ten-trip?</button>
+        <button type="button" data-q="How much more does a Hicksville commuter pay now than before January 2026?">Hicksville commuter, before vs after</button>
+        <button type="button" data-q="Roughly how much more did LIRR riders spend on tickets in Feb-Sep 2026 than in Feb-Sep 2025?">Did riders spend more overall?</button>
+        <button type="button" data-q="Did more riders buy in the TrainTime app instead of ticket machines after the change?">App vs ticket machines</button>
+        <button type="button" data-q="Did trains get less crowded after the fare increase?">Did trains get emptier?</button>
+        <button type="button" data-q="Did things change?" class="vague">“Did things change?” (vague on purpose)</button>
+      </div>
+      <div id="thread" class="thread" aria-live="polite"></div>
+      <form id="ask-form" class="ask-form">
+        <textarea id="q" rows="2" maxlength="1000" placeholder="e.g. Did Day Pass buyers ride more on weekends?" required></textarea>
+        <button type="submit" class="btn" id="ask-btn">Ask</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div>
+      <h3>Data</h3>
+      <ul>
+        <li><a href="https://data.ny.gov/d/5ypk-fceg" target="_blank" rel="noopener">MTA Railroad Ticket Sales</a> (17.4M rows, 2025–Sep 2026)</li>
+        <li><a href="https://data.ny.gov/d/sayj-mze2" target="_blank" rel="noopener">MTA Daily Ridership</a> and <a href="https://data.ny.gov/d/xfre-bxip" target="_blank" rel="noopener">Monthly Ridership</a></li>
+        <li><a href="https://data.ny.gov/d/hb2b-cimm" target="_blank" rel="noopener">MTA LIRR Stop-Level Occupancy</a> (4.9M rows)</li>
+        <li>LIRR fare charts effective Aug 20 2023 and Jan 4 2026, hand-entered from MTA PDFs</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Under the hood</h3>
+      <p>A Lead agent plans and reviews, Researchers write their own SQL against DuckDB in fresh contexts,
+      and a Writer cites every number. Code, not the model, checks that each citation is a query that ran
+      and that each number appears in its rows. Built with Gemini on Google Cloud Run for a Columbia
+      agentic-AI course; not affiliated with the MTA.</p>
+    </div>
+  </footer>
+
+  <template id="turn-tpl">
+    <article class="turn">
+      <p class="you"></p>
+      <div class="live">
+        <ol class="rail">
+          <li data-phase="planning">Plan</li>
+          <li data-phase="researching">Research</li>
+          <li data-phase="reviewing">Review</li>
+          <li data-phase="writing">Write</li>
+        </ol>
+        <p class="live-status"><span class="spinner" aria-hidden="true"></span><span class="status-text">Lead is reading your question…</span> <span class="elapsed">0s</span></p>
+        <div class="lanes"></div>
+      </div>
+      <div class="answer" hidden></div>
+    </article>
+  </template>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>
