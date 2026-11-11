@@ -27,13 +27,16 @@ from google.genai import types
 
 from .tools import run_tool, tool_specs
 
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 DEFAULT_MAX_ROUNDS = 8
 RETRY_WAITS = [5, 15, 30]  # seconds to wait after a 429/503 before trying again
-# Gemini 2.5 "thinks" before answering, which adds seconds to every call. Our agents
+# Gemini "thinks" before answering, which adds seconds to every call. Our agents
 # get structured prompts and data, so thinking is off by default (0). Set
 # GEMINI_THINKING_BUDGET to e.g. 512 to turn some back on, or "" to use Gemini's default.
 THINKING_BUDGET = os.environ.get("GEMINI_THINKING_BUDGET", "0")
+# Gemini 3 models take a level instead of a budget: minimal, low, medium or high.
+THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "minimal")
+REQUEST_TIMEOUT_MS = int(os.environ.get("GEMINI_TIMEOUT_MS", "90000"))  # one hung call can't eat the whole answer
 
 log = logging.getLogger("uvicorn.error")  # shows up in the uvicorn terminal
 
@@ -46,7 +49,9 @@ def client() -> genai.Client:
         # Reads GEMINI_API_KEY from the environment. Tool calling needs the
         # v1beta API; newer SDK versions default to v1, which rejects tools.
         _client = genai.Client(
-            http_options=types.HttpOptions(api_version=os.environ.get("GEMINI_API_VERSION", "v1beta"))
+            http_options=types.HttpOptions(
+                api_version=os.environ.get("GEMINI_API_VERSION", "v1beta"), timeout=REQUEST_TIMEOUT_MS
+            )
         )
     return _client
 
@@ -82,7 +87,7 @@ def gemini_tools(tool_names: list[str] | None) -> list[types.Tool]:
 
 def _is_retryable(e: Exception) -> bool:
     msg = str(e)
-    return any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"))
+    return any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "504", "DEADLINE_EXCEEDED"))
 
 
 def _generate(model: str, contents, config):
@@ -103,6 +108,9 @@ def _generate(model: str, contents, config):
 
 
 def _thinking_config(model: str):
+    if "gemini-3" in model:
+        level = THINKING_LEVEL.strip()
+        return types.ThinkingConfig(thinking_level=level) if level else None
     if THINKING_BUDGET.strip() == "" or "2.5" not in model:
         return None
     budget = int(THINKING_BUDGET)
