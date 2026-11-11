@@ -4,7 +4,4 @@ __pycache__/
 data/raw/
 *.duckdb
 *.duckdb.wal
-.venv/
-data/raw/
-*.duckdb
-*.duckdb.wal
+.pytest_cache/
