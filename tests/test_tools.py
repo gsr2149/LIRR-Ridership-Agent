@@ -1,4 +1,4 @@
-"""Tests for app/tools. They build a tiny fake database with the same columns
+"""Tests for lirr_agent/tools. They build a tiny fake database with the same columns
 as the real one, so they run in a second and don't need the 17M-row file.
 
     python -m pytest -q
@@ -7,9 +7,9 @@ as the real one, so they run in a second and don't need the 17M-row file.
 import duckdb
 import pytest
 
-from app import tools
-from app.tools import db, fares, run_tool, tool_specs
-from app.tools.sql import query_id, validate
+from lirr_agent import tools
+from lirr_agent.tools import db, fares, run_tool, tool_specs
+from lirr_agent.tools.sql import query_id, validate
 
 
 @pytest.fixture(autouse=True)
@@ -139,3 +139,35 @@ def test_lookup_fare_explains_what_it_cannot_answer():
     assert "discontinued" in run_tool("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "ten_trip"})["error"]
     assert "not an LIRR fare zone" in run_tool("lookup_fare", {"origin": "2", "destination": "7"})["error"]
     assert "Unknown LIRR station" in run_tool("lookup_fare", {"origin": "Narnia", "destination": "7"})["error"]
+
+def test_ensure_database_downloads_from_gcs(tmp_path, monkeypatch):
+    """With LIRR_DB_GCS_URI set and no local file, the database is fetched once."""
+    import sys
+    import types as pytypes
+
+    calls = []
+
+    class FakeBlob:
+        def download_to_filename(self, filename, raw_download=False):
+            calls.append(filename)
+            with open(filename, "wb") as fh:
+                fh.write(b"duckdb bytes")
+
+    class FakeClient:
+        def bucket(self, name):
+            assert name == "my-bucket"
+            return pytypes.SimpleNamespace(blob=lambda name: FakeBlob() if name == "dir/lirr.duckdb" else None)
+
+    fake_storage = pytypes.SimpleNamespace(Client=FakeClient)
+    monkeypatch.setitem(sys.modules, "google.cloud.storage", fake_storage)
+    import google.cloud
+    monkeypatch.setattr(google.cloud, "storage", fake_storage, raising=False)
+
+    target = tmp_path / "sub" / "lirr.duckdb"
+    monkeypatch.setenv("LIRR_DB_PATH", str(target))
+    monkeypatch.setenv("LIRR_DB_GCS_URI", "gs://my-bucket/dir/lirr.duckdb")
+
+    assert db.ensure_database() == target
+    assert target.read_bytes() == b"duckdb bytes"
+    assert db.ensure_database() == target  # already there: no second download
+    assert len(calls) == 1

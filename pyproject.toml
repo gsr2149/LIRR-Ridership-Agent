@@ -1,0 +1,27 @@
+[project]
+name = "lirr-agent"
+version = "1.0.0"
+description = "Deep-research agent on how the January 2026 LIRR fare changes changed what riders buy and pay"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.1",
+    "fastapi>=0.115",
+    "google-cloud-storage>=2.18",
+    "google-genai>=1.30",
+    "python-dotenv>=1.0",
+    "requests>=2.32",
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

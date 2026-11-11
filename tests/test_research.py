@@ -11,9 +11,9 @@ import time
 import pytest
 from google.genai import types
 
-from app import llm, sessions
-from app.agents import lead, writer
-from app.tools.sql import query_id
+from lirr_agent import llm, sessions
+from lirr_agent.agents import lead, writer
+from lirr_agent.tools.sql import query_id
 from test_tools import fake_db  # noqa: F401  (reuses the tiny fake database)
 
 SQL_MIX = ("SELECT sold_as, sum(number_of_tickets) AS n FROM ticket_sales "

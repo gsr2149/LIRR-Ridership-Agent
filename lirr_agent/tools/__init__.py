@@ -4,7 +4,7 @@ Each tool has a name, a description for the model, a JSON Schema for its
 arguments, and the Python function that runs it. The schemas are plain JSON
 Schema, so they work with any LLM provider's tool-calling format.
 
-    from app.tools import TOOLS, run_tool
+    from lirr_agent.tools import TOOLS, run_tool
     result = run_tool("run_sql", {"sql": "SELECT 1", "purpose": "test"})
 """
 

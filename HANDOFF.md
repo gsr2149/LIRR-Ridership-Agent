@@ -11,21 +11,21 @@ change what riders buy and what they pay?**
 | Requirement | Status | Where |
 |---|---|---|
 | Uses data the model doesn't know deeply | ✅ Done | 4 data.ny.gov datasets + the Jan 2026 fare chart (`data/`) |
-| Gets at the data through tools | ✅ Done | `list_tables`, `describe_table`, `run_sql`, `lookup_fare` (`app/tools/`) |
-| Combines evidence into a supported claim | ✅ Done | Writer agent (`app/agents/writer.py`) |
+| Gets at the data through tools | ✅ Done | `list_tables`, `describe_table`, `run_sql`, `lookup_fare` (`lirr_agent/tools/`) |
+| Combines evidence into a supported claim | ✅ Done | Writer agent (`lirr_agent/agents/writer.py`) |
 | States when the data can't answer | ✅ Done | Lead `out_of_scope`, Writer "What the data can't tell us", tool errors |
-| Shows its work; `/chat` keeps the Project 1 shape; sub-agent calls in `tool_calls` with an `agent` field | ✅ Done | `app/main.py`, `app/llm.py` |
-| Deep Research: Lead, Researchers, Writer (3 agent shapes) | ✅ Done | `app/agents/lead.py`, `researcher.py`, `writer.py` |
+| Shows its work; `/chat` keeps the Project 1 shape; sub-agent calls in `tool_calls` with an `agent` field | ✅ Done | `lirr_agent/main.py`, `lirr_agent/llm.py` |
+| Deep Research: Lead, Researchers, Writer (3 agent shapes) | ✅ Done | `lirr_agent/agents/lead.py`, `researcher.py`, `writer.py` |
 | Lead fans out to several Researchers in one turn, in parallel, fresh contexts | ✅ Done | `lead.dispatch()` (thread pool) |
 | Lead goes back for more when there's a gap, up to a turn cap | ✅ Done | `lead.review()`, `MAX_RESEARCH_ROUNDS` |
 | Vague questions get clarification | ✅ Done | Lead `clarify` action |
 | Output is accurately cited | ✅ Done | Citations checked in code; Sources list generated from real queries |
-| Speed (answers took 1-2 minutes) | 🟡 Fix written, not applied | **Step 1** below |
+| Speed (answers took 1-2 minutes) | ✅ Done | speed patch applied (`feat/deploy`) |
 | Front end: says what it explores, who it's for, how to use it | ❌ To do | **Step 2** below (current page is a bare test page) |
 | Deployed to Google Cloud Run | ❌ To do | **Step 3** below |
 | README | ❌ To do | **Step 4** below |
 
-All 32 tests pass on `main` (`python -m pytest -q`).
+All 32 tests pass on `main` (`uv run pytest -q`).
 
 ## How it works (one turn of `/chat`)
 
@@ -52,11 +52,11 @@ the trace has entries for the agents' decisions: `plan`, `dispatch_researchers`,
 |---|---|
 | `data/fetch.py`, `data/build_db.py` | Download the datasets, build `data/lirr.duckdb`, write `data/SCHEMA.md` |
 | `data/fares/` | Fare chart PDF and the 576-row CSV made from it |
-| `app/tools/` | The four data tools + registry (`python -m app.tools ...` to try them) |
-| `app/llm.py` | Gemini tool loop, retries, JSON helper |
-| `app/agents/` | Lead, Researcher, Writer, shared prompt text (`context.py`) |
-| `app/main.py` | FastAPI: `GET /`, `GET /health`, `POST /chat` |
-| `app/static/index.html` | Front end (temporary) |
+| `lirr_agent/tools/` | The four data tools + registry (`python -m lirr_agent.tools ...` to try them) |
+| `lirr_agent/llm.py` | Gemini tool loop, retries, JSON helper |
+| `lirr_agent/agents/` | Lead, Researcher, Writer, shared prompt text (`context.py`) |
+| `lirr_agent/main.py` | FastAPI: `GET /`, `GET /health`, `POST /chat` |
+| `lirr_agent/static/index.html` | Front end (temporary) |
 | `tests/` | 32 tests with a fake Gemini; no API key needed |
 
 ---
@@ -79,10 +79,10 @@ Use Python 3.11 or 3.12. If you use Anaconda, run `conda deactivate` first so it
 packages don't get mixed in.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt -r requirements-dev.txt
-python -m pytest -q          # expect 32 passed
+# install uv: https://docs.astral.sh/uv/
+
+uv sync
+uv run pytest -q          # expect 32 passed
 ```
 
 ### Gemini key
@@ -110,7 +110,7 @@ python data/build_db.py
 ### Run it
 
 ```bash
-python -m uvicorn app.main:app --reload
+uv run uvicorn app:app --reload
 ```
 
 Open http://127.0.0.1:8000.
@@ -123,15 +123,15 @@ The file `patches/speed-up.patch` (committed next to this file) makes answers mu
 faster without changing what they find. It was tested against `main`: all 32 tests pass.
 
 What it changes:
-- **Gemini "thinking" off** (`GEMINI_THINKING_BUDGET=0` by default in `app/llm.py`).
+- **Gemini "thinking" off** (`GEMINI_THINKING_BUDGET=0` by default in `lirr_agent/llm.py`).
   Thinking added several seconds to every one of the 15-25 calls per answer.
-- **Schema cached** (`app/tools/schema.py`). `describe_table` on the 17M-row ticket
+- **Schema cached** (`lirr_agent/tools/schema.py`). `describe_table` on the 17M-row ticket
   table took seconds and every Researcher called it.
 - **Researchers get the schema up front** (`context.schema_brief()`), so they go straight
   to SQL instead of spending two Gemini calls discovering tables. `list_tables` was
   removed from their tools.
 - **Round cap 2** by default (`MAX_RESEARCH_ROUNDS`): the plan, plus one follow-up round.
-- **Warm-up at startup** (`app/main.py` lifespan), so the first question isn't slow.
+- **Warm-up at startup** (`lirr_agent/main.py` lifespan), so the first question isn't slow.
 - **Timing logs** in the uvicorn terminal, e.g. `research round 1: 3 researchers 21.4s`,
   plus a warning whenever Gemini rate-limits and the code waits.
 
@@ -140,8 +140,8 @@ git checkout main && git pull origin main
 git checkout -b feat/speed
 git apply patches/speed-up.patch
 git rm patches/speed-up.patch
-python -m pytest -q          # expect 32 passed
-python -m uvicorn app.main:app --reload
+uv run pytest -q          # expect 32 passed
+uv run uvicorn app:app --reload
 ```
 
 Ask a question and watch the timing lines in the terminal. If you see
@@ -165,7 +165,7 @@ git push -u origin feat/speed
 
 ## Step 2: Front end (`feat/frontend`)
 
-Replace `app/static/index.html` (and add CSS/JS files in `app/static/` if you like;
+Replace `lirr_agent/static/index.html` (and add CSS/JS files in `lirr_agent/static/` if you like;
 they're served at `/static/...`). Keep calling `POST /chat` exactly as the current page does.
 
 **Required by the assignment.** The page must say:
@@ -202,7 +202,7 @@ they're served at `/static/...`). Keep calling `POST /chat` exactly as the curre
 - Works on a phone (no horizontal scrolling; wrap long SQL).
 
 Checks:
-- `python -m pytest -q` still passes (`tests/test_chat.py` checks the page contains "LIRR").
+- `uv run pytest -q` still passes (`tests/test_chat.py` checks the page contains "LIRR").
 - Try each example question in the browser.
 
 ---
@@ -355,7 +355,7 @@ Replace the one-line `README.md` with:
 ## Step 5: Final checks before submitting
 
 - [ ] `main` has everything: on GitHub, every branch's pull request shows **Merged**.
-- [ ] `python -m pytest -q` passes on `main`.
+- [ ] `uv run pytest -q` passes on `main`.
 - [ ] The live URL loads the front end and answers a question with citations and a trace.
 - [ ] A vague question ("Did things change?") gets a clarifying question.
 - [ ] An out-of-scope question ("How crowded is the subway?") is declined with what it *can* answer.
@@ -384,7 +384,7 @@ git tag -a v1.0 -m "Submitted version" && git push origin v1.0
 - **`No module named 'fastapi'` with `/Applications/anaconda3/...` in the error:**
   conda's Python is being used. Run `conda deactivate`, `source .venv/bin/activate`,
   then `python -m uvicorn ...`.
-- **`Function calling is not enabled for api version v1`:** already fixed. `app/llm.py`
+- **`Function calling is not enabled for api version v1`:** already fixed. `lirr_agent/llm.py`
   forces the `v1beta` API. Don't remove that.
 - **`429 RESOURCE_EXHAUSTED`:** a Gemini rate limit. The code retries automatically;
   a daily limit needs a new day, another key, or billing on the Google Cloud project.

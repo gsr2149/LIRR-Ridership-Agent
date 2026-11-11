@@ -1,12 +1,12 @@
 """Try the tools by hand against your real database.
 
-    python -m app.tools list_tables
-    python -m app.tools describe_table ticket_sales
-    python -m app.tools run_sql "SELECT sold_as, sum(number_of_tickets) AS n FROM ticket_sales WHERE railroad = 'LIRR' GROUP BY 1 ORDER BY n DESC"
-    python -m app.tools lookup_fare "Penn Station" Hicksville monthly
+    python -m lirr_agent.tools list_tables
+    python -m lirr_agent.tools describe_table ticket_sales
+    python -m lirr_agent.tools run_sql "SELECT sold_as, sum(number_of_tickets) AS n FROM ticket_sales WHERE railroad = 'LIRR' GROUP BY 1 ORDER BY n DESC"
+    python -m lirr_agent.tools lookup_fare "Penn Station" Hicksville monthly
 
 You can also pass the arguments as JSON:
-    python -m app.tools lookup_fare '{"origin": "1", "destination": "7"}'
+    python -m lirr_agent.tools lookup_fare '{"origin": "1", "destination": "7"}'
 """
 
 import json

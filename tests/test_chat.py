@@ -8,8 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 from google.genai import types
 
-from app import agents, llm, sessions
-from app.main import app
+from lirr_agent import agents, llm, sessions
+from lirr_agent.main import app
 from test_tools import fake_db  # noqa: F401  (reuses the tiny fake database)
 
 

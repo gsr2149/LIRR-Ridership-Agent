@@ -4,7 +4,7 @@
     response: {"response": "...", "session_id": "...",
                "tool_calls": [{"agent": "...", "name": "...", "args": {...}, "result": {...}}]}
 
-Run locally:  uvicorn app.main:app --reload
+Run locally:  uvicorn app:app --reload
 """
 
 import logging
@@ -27,9 +27,13 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(_app):
-    # Describe every table once at startup, so the first question isn't slow.
+    # Fetch the database from GCS if needed (Cloud Run), then describe every
+    # table once, so the first question isn't slow.
     try:
         from .agents.context import schema_brief
+        from .tools.db import ensure_database
+
+        ensure_database()
         schema_brief()
     except Exception as e:  # e.g. database not built yet: the app still starts
         logging.getLogger("uvicorn.error").warning("Schema warm-up skipped: %s", e)
