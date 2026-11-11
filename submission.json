@@ -1,5 +1,5 @@
 {
-  "deploy_url": "https://REPLACE-WITH-CLOUD-RUN-URL.run.app",
+  "deploy_url": "https://lirr-agent-343981342907.us-east1.run.app",
   "authors": ["hgn2108", "gsr2149"],
   "path": "research"
 }

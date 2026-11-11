@@ -46,13 +46,19 @@ _client: genai.Client | None = None
 def client() -> genai.Client:
     global _client
     if _client is None:
-        # Reads GEMINI_API_KEY from the environment. Tool calling needs the
-        # v1beta API; newer SDK versions default to v1, which rejects tools.
-        _client = genai.Client(
-            http_options=types.HttpOptions(
-                api_version=os.environ.get("GEMINI_API_VERSION", "v1beta"), timeout=REQUEST_TIMEOUT_MS
+        if os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("1", "true"):
+            # Cloud Run: Gemini through Vertex AI, billed to the GCP project and
+            # authenticated as the service account (no API key). Reads
+            # GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (use "global").
+            _client = genai.Client(http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS))
+        else:
+            # Gemini API key (GEMINI_API_KEY). Tool calling needs the v1beta API;
+            # newer SDK versions default to v1, which rejects tools.
+            _client = genai.Client(
+                http_options=types.HttpOptions(
+                    api_version=os.environ.get("GEMINI_API_VERSION", "v1beta"), timeout=REQUEST_TIMEOUT_MS
+                )
             )
-        )
     return _client
 
 
