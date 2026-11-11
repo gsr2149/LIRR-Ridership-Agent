@@ -1,4 +1,4 @@
-/* After the Ten-Trip: front end for the LIRR fare research agent.
+/* LIRR Fare Desk: front end for the LIRR fare research agent.
  * Talks to POST /chat/stream (live NDJSON events, falls back to POST /chat),
  * GET /api/stations and GET /api/fare. No build step. */
 "use strict";
@@ -33,6 +33,13 @@ fetch("/api/stations").then((r) => r.json()).then(({ stations }) => {
   $("#stations").innerHTML = stations.map((s) => `<option value="${esc(s.name)}">Zone ${esc(s.zone)}</option>`).join("");
 }).catch(() => {});
 
+$("#swap").addEventListener("click", () => {
+  const a = $("#from").value;
+  $("#from").value = $("#to").value;
+  $("#to").value = a;
+  if ($("#from").value && $("#to").value) $("#commute-form").requestSubmit();
+});
+
 $("#commute-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const from = $("#from").value.trim(), to = $("#to").value.trim();
@@ -42,7 +49,7 @@ $("#commute-form").addEventListener("submit", async (e) => {
     const r = await fetch(`/api/fare?origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}`);
     const data = await r.json();
     if (data.error) { out.innerHTML = `<p class="error-box">${esc(data.error)}</p>`; return; }
-    out.innerHTML = renderFares(data, from, to);
+    out.innerHTML = renderFares(data, data.origin_name || from, data.destination_name || to);
     $(".fare-ask button", out)?.addEventListener("click", (ev) => {
       $("#q").value = ev.currentTarget.dataset.q;
       $("#ask-form").requestSubmit();
@@ -254,6 +261,10 @@ class LiveBoard {
     const secs = Math.round((Date.now() - this.started) / 1000);
     $(".status-text", this.el).textContent = `Done in ${secs}s.`;
     $(".elapsed", this.el).textContent = "";
+    const nR = Object.keys(this.researchers).length;
+    const nQ = this.el.querySelectorAll(".steps li").length;
+    $(".live-summary", this.el).textContent = `Research log · ${nR} researcher${nR === 1 ? "" : "s"} · ${nQ} tool call${nQ === 1 ? "" : "s"} · ${secs}s`;
+    this.el.open = false;
   }
 }
 
@@ -280,7 +291,10 @@ function renderAnswer(turn, body) {
   if (kind === "out_of_scope") a.classList.add("scope");
   if (kind !== "research") $(".live", turn).hidden = true;
 
-  const html = DOMPurify.sanitize(marked.parse(citeLinks(body.response || "", turnId)));
+  const options = (kind === "clarify" || kind === "out_of_scope") ? (plan.result.options || []) : [];
+  let text = body.response || "";
+  if (options.length) text = text.split(/\n\nYou could ask:\n/)[0];  // shown as buttons instead
+  const html = DOMPurify.sanitize(marked.parse(citeLinks(text, turnId)));
   const numbers = calls.find((c) => c.name === "verify_numbers")?.result;
   const cites = calls.find((c) => c.name === "verify_citations")?.result;
   const charts = calls.filter((c) => c.name === "chart").map((c) => c.result);
@@ -289,12 +303,15 @@ function renderAnswer(turn, body) {
     ${kind === "clarify" ? `<p class="answer-kind">One question first — reply below</p>` : ""}
     ${kind === "out_of_scope" ? `<p class="answer-kind">Outside what this data can answer</p>` : ""}
     <div class="answer-body">${html}</div>
+    ${options.length ? `<div class="options">${options.map((o) => `<button type="button" data-q="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : ""}
     ${checksHtml(cites, numbers)}
     <div class="charts"></div>
     ${kind === "research" ? traceHtml(calls, turnId) : ""}`;
 
   charts.forEach((spec) => drawChart($(".charts", a), spec, turnId));
   a.addEventListener("click", (e) => {
+    const opt = e.target.closest(".options button[data-q]");
+    if (opt && !busy) { $("#q").value = opt.dataset.q; $("#ask-form").requestSubmit(); return; }
     const link = e.target.closest("a.cite[data-q]");
     if (!link) return;
     e.preventDefault();
@@ -318,6 +335,12 @@ function checksHtml(cites, numbers) {
   return `<div class="checks">${out.join("")}</div>`;
 }
 
+const HUMAN = { sold_as: "ticket type", device_class_type: "sales channel", fare_type: "fare type",
+  number_of_tickets: "tickets", pct: "%", n: "count" };
+function human(s) {
+  return String(s ?? "").split("_").map((w) => HUMAN[w] ?? w).join(" ").replace(/\b(\w+) %/g, "$1 (%)");
+}
+
 function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 function drawChart(container, spec, turnId) {
@@ -332,7 +355,7 @@ function drawChart(container, spec, turnId) {
     data: {
       labels: spec.labels,
       datasets: spec.series.map((s, i) => ({
-        label: s.name, data: s.values, borderColor: colors[i % 6], backgroundColor: colors[i % 6],
+        label: human(s.name), data: s.values, borderColor: colors[i % 6], backgroundColor: colors[i % 6],
         borderWidth: 2, pointRadius: spec.labels.length > 24 ? 0 : 2.5, tension: 0.25, spanGaps: true,
       })),
     },
@@ -342,7 +365,7 @@ function drawChart(container, spec, turnId) {
       scales: {
         x: { ticks: { color: ink, maxRotation: 45, autoSkip: true, font: { family: "Overpass Mono", size: 10 } }, grid: { color: grid } },
         y: { ticks: { color: ink, font: { family: "Overpass Mono", size: 10 } }, grid: { color: grid },
-             title: { display: !!spec.y_label, text: spec.y_label, color: ink } },
+             title: { display: !!spec.y_label, text: human(spec.y_label), color: ink } },
       },
     },
   });

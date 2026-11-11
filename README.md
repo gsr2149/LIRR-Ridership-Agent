@@ -1,4 +1,4 @@
-# After the Ten-Trip: an LIRR fare research agent
+# LIRR Fare Desk: what the January 2026 fare change did to riders
 
 **Live:** https://lirr-agent-343981342907.us-east1.run.app · **Path:** Deep Research · **Team:** hgn2108, gsr2149
 

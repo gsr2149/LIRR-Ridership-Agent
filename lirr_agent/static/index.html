@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>After the Ten-Trip · LIRR fare research</title>
-  <meta name="description" content="An AI research team that digs through LIRR ticket sales, ridership, train crowding and fare charts to explain what the January 2026 fare change did to riders.">
+  <title>LIRR Fare Desk · what the 2026 fare change did to riders</title>
+  <meta name="description" content="LIRR Fare Desk: an AI research team that works through MTA ticket sales, ridership, train crowding and fare charts to explain what the January 2026 LIRR fare change did to riders.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -14,21 +14,23 @@
   <header class="board">
     <div class="board-inner">
       <div class="board-row board-meta">
-        <span>LIRR · FARE CHANGE OF JAN 4 2026</span>
+        <span>RESEARCH DESK · JAN 4 2026 FARE CHANGE</span>
         <span class="board-clock" id="clock">--:--</span>
       </div>
-      <h1 class="flap" aria-label="After the Ten-Trip">
-        <span>AFTER</span> <span>THE</span> <span>TEN-TRIP</span>
+      <h1 class="flap" aria-label="LIRR Fare Desk">
+        <span>LIRR</span> <span>FARE</span> <span>DESK</span>
       </h1>
+      <p class="board-sub">What the January 2026 fare change did to riders</p>
       <p class="board-lede">
         On January 4, 2026 the Long Island Rail Road raised fares, retired the ten-trip ticket and
-        swapped round trips for a Day Pass. Ask a question and a small team of AI researchers digs
-        through 17 million rows of ticket sales, daily ridership, train crowding counts and both fare
-        charts to find out <strong>what riders bought instead, and what they pay now</strong>.
+        replaced round trips with a Day Pass. Ask a question and a team of AI researchers works
+        through the MTA's own ticket sales, ridership and train-crowding data to show
+        <strong>what riders bought instead, and what they pay now</strong>, with every number traced
+        to the query behind it.
       </p>
       <div class="board-row board-status">
-        <span><i class="dot ok"></i>Researchers on duty</span>
-        <span>Data through Sep 30 2026</span>
+        <span><i class="dot ok"></i>89M tickets · 5 public sources</span>
+        <span>Data Jan 2025 – Sep 2026</span>
         <a href="#about">How it works ↓</a>
       </div>
     </div>
@@ -69,7 +71,7 @@
       </div>
       <form id="commute-form" class="commute-form" autocomplete="off">
         <label>From <input id="from" list="stations" placeholder="Penn Station" required></label>
-        <span class="arrow" aria-hidden="true">⇄</span>
+        <button type="button" class="swap" id="swap" aria-label="Swap stations" title="Swap">⇄</button>
         <label>To <input id="to" list="stations" placeholder="Hicksville" required></label>
         <button type="submit" class="btn">Compare fares</button>
         <datalist id="stations"></datalist>
@@ -120,7 +122,8 @@
   <template id="turn-tpl">
     <article class="turn">
       <p class="you"></p>
-      <div class="live">
+      <details class="live" open>
+        <summary class="live-summary">Research log</summary>
         <ol class="rail">
           <li data-phase="planning">Plan</li>
           <li data-phase="researching">Research</li>
@@ -129,7 +132,7 @@
         </ol>
         <p class="live-status"><span class="spinner" aria-hidden="true"></span><span class="status-text">Lead is reading your question…</span> <span class="elapsed">0s</span></p>
         <div class="lanes"></div>
-      </div>
+      </details>
       <div class="answer" hidden></div>
     </article>
   </template>

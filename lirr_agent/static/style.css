@@ -60,16 +60,19 @@ button { font: inherit; }
 .flap span:nth-child(2) { animation-delay: .12s; } .flap span:nth-child(3) { animation-delay: .24s; }
 @keyframes flip { from { transform: rotateX(80deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .flap span { animation: none; } }
+.board-sub { margin: 0 0 12px; font: 600 1.15rem/1.3 "Overpass", sans-serif; color: #fff; }
 .board-lede { max-width: 760px; margin: 6px 0 18px; font-size: 1.05rem; color: #ddd8cd; }
 .board-lede strong { color: #fff; }
 .board-status a { color: var(--amber); text-decoration: none; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
 .dot.ok { background: #5fc08a; box-shadow: 0 0 0 3px rgba(95,192,138,.2); }
 
-main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid; gap: 22px; }
+main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid; gap: 22px;
+  grid-template-columns: minmax(0, 1fr); }
+main > *, .thread > *, .turn, .answer, .lanes > * { min-width: 0; }
 
 /* ---------- ticket stubs ---------- */
-.stubs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.stubs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .stub { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
   position: relative; box-shadow: var(--shadow); }
 .stub::before { content: ""; position: absolute; left: 0; right: 0; top: 44px; border-top: 2px dashed var(--line); }
@@ -100,7 +103,9 @@ main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid
   font: 1rem "Overpass", sans-serif; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
   border-radius: 8px; padding: .6em .75em; width: 100%; }
 .commute-form input:focus, .ask-form textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.commute-form .arrow { padding-bottom: .55em; color: var(--muted); }
+.swap { align-self: end; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px;
+  width: 2.6em; height: 2.6em; cursor: pointer; font-size: 1rem; }
+.swap:hover { border-color: var(--accent); color: var(--accent); }
 #commute-result { margin-top: 14px; }
 .fare-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin-bottom: 8px; }
 .fare-head b { font-size: 1.05rem; }
@@ -127,7 +132,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid
 .examples button.vague { font-style: italic; }
 .ask-form { display: flex; gap: 10px; align-items: stretch; margin-top: 12px; }
 .ask-form textarea { resize: vertical; min-height: 3em; }
-.thread { display: grid; gap: 16px; }
+.thread { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 .thread:empty { display: none; }
 
 .turn { border-top: 1px dashed var(--line); padding-top: 14px; }
@@ -138,6 +143,13 @@ main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid
 
 /* live research board */
 .live { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.live-summary { display: none; cursor: pointer; font-weight: 600; font-size: .92rem; }
+.live.finished .live-summary { display: list-item; }
+.live.finished[open] .live-summary { margin-bottom: 10px; }
+.options { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.options button { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); border-radius: 999px;
+  padding: .4em .95em; cursor: pointer; font-size: .92rem; text-align: left; }
+.options button:hover { filter: brightness(1.05); }
 .rail { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr);
   position: relative; font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; }
 .rail::before { content: ""; position: absolute; left: 12%; right: 12%; top: 8px; height: 3px; background: var(--line); }
@@ -155,7 +167,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid
   animation: spin .8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .live.finished .spinner { display: none; }
-.lanes { display: grid; gap: 10px; }
+.lanes { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
 .lane { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--c6); border-radius: 8px; padding: 9px 11px; min-width: 0; }
 .lane.lead { border-left-color: var(--amber); }
 .lane.writer { border-left-color: var(--c3); }
@@ -164,7 +176,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; display: grid
   letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .lane-head .state { margin-left: auto; text-transform: none; letter-spacing: 0; }
 .lane .subq { margin: 4px 0 6px; font-weight: 600; font-size: .95rem; }
-.researchers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.researchers { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 10px; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .86rem; }
 .steps li { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
 .steps li .tag { font: 600 .7rem "Overpass Mono", monospace; color: var(--accent); flex: none; }
@@ -190,7 +202,7 @@ a.cite.bg { background: var(--code); color: var(--muted); }
 .badge { font: 600 .78rem "Overpass Mono", monospace; border-radius: 6px; padding: 4px 9px; border: 1px solid var(--line); }
 .badge.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
 .badge.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
-.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 12px 0; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; margin: 12px 0; }
 .chart { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-width: 0; }
 .chart h4 { margin: 0 0 6px; font-size: .85rem; font-weight: 600; }
 .chart .box { position: relative; height: 230px; }
@@ -220,9 +232,9 @@ table.rows th { background: var(--code); }
 .foot ul { margin: 0; padding-left: 1.1em; }
 
 @media (max-width: 760px) {
-  .stubs, .foot { grid-template-columns: 1fr; }
+  .stubs, .foot { grid-template-columns: minmax(0, 1fr); }
   .ask-form { flex-direction: column; }
-  .commute-form .arrow { display: none; }
+  .swap { align-self: center; }
   .commute-form .btn { width: 100%; }
   .rail { font-size: .66rem; }
   .fares { font-size: .86rem; }
