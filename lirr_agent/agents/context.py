@@ -2,7 +2,9 @@
 
 from ..tools.schema import TABLE_NOTES
 
-FARE_CITATION = "fare chart 2026-01-04"
+FARE_CITATION = "fare chart 2026-01-04"         # prices after the change
+FARE_CITATION_BEFORE = "fare chart 2023-08-20"  # prices before the change
+FARE_CITATIONS = (FARE_CITATION, FARE_CITATION_BEFORE)
 BACKGROUND_CITATION = "MTA announcement"
 
 BACKGROUND = f"""Background (from MTA announcements, NOT from the datasets; cite as [{BACKGROUND_CITATION}]):
@@ -13,14 +15,22 @@ replaced by a Day Pass (weekday and weekend prices), and buying onboard costs mo
 DATA_RULES = f"""Data rules:
 - Filter to the LIRR: ticket_sales railroad = 'LIRR'; daily_ridership mode = 'LIRR';
   monthly_ridership agency = 'LIRR'. stop_occupancy and lirr_fares are LIRR only.
-- ticket_sales has ticket COUNTS (number_of_tickets), not revenue. lirr_fares has only
-  2026 prices. So "how much more does a ticket cost than before" cannot be computed;
-  estimates of spending must multiply 2026 counts by 2026 prices and say so.
+- ticket_sales has ticket COUNTS (number_of_tickets), not revenue. lirr_fares has prices
+  before (fare_period 'pre_2026', effective 2023-08-20) and after ('post_2026', effective
+  2026-01-04) the change, so price changes per ticket CAN be computed (lookup_fare does it
+  for one zone pair; SQL can join the two periods). Spending is an ESTIMATE: tickets sold
+  x the matching price. For spending, use the ticket_spend_est table (already priced,
+  with the counting quirks handled) rather than joining tables yourself, and report the
+  share of tickets it could price in each period.
+- Counting quirks in ticket_sales: a ten_trip ticket is counted as 10 tickets (one per ride:
+  every ten_trip count is a multiple of 10), and round trips are mostly counted per leg. So
+  ticket counts are closer to RIDES than to purchases; say so when comparing ticket types.
 - Compare like with like: the same calendar months before and after (e.g. Feb-Sep 2025
   vs Feb-Sep 2026), leaving out the transition weeks around 2026-01-04. Give shares
   (percent of LIRR tickets) as well as counts.
 - Ticket sales and occupancy cover 2025-01-01 to 2026-09-30 in this database.
-- Fares from lookup_fare are cited as [{FARE_CITATION}]."""
+- Prices from lookup_fare are cited by the chart they come from: [{FARE_CITATION}] for
+  2026 prices, [{FARE_CITATION_BEFORE}] for pre-2026 prices (cite both for a change)."""
 
 
 def data_catalog() -> str:
@@ -33,7 +43,8 @@ def data_catalog() -> str:
     return "\n".join(lines)
 
 
-SCHEMA_TABLES = ["ticket_sales", "daily_ridership", "monthly_ridership", "stop_occupancy", "lirr_fares"]
+SCHEMA_TABLES = ["ticket_sales", "daily_ridership", "monthly_ridership", "stop_occupancy", "lirr_fares",
+                 "ticket_spend_est"]
 MAX_VALUES_SHOWN = 12
 
 

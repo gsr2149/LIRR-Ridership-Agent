@@ -65,7 +65,9 @@ fare change, the usual angles are:
      same months, i.e. what riders bought instead
   3. how riders buy: the mix of device_class_type (mobile app, machines, onboard) before vs after
   4. context: LIRR ridership over the same months, to separate "fewer riders" from
-     "riders switched tickets"; or 2026 prices from lookup_fare for what riders pay now
+     "riders switched tickets"
+  5. price: what the same trip cost before vs after (lirr_fares has both periods), or an
+     estimate of what riders spent: tickets sold x matching prices, before vs after
 Pick the angles that fit the question."""
 
 REVIEW_PROMPT = f"""You are the Lead of a research team studying the LIRR fare and ticketing
@@ -88,7 +90,7 @@ Return JSON:
     contradicts another finding
   At most {MAX_FOLLOW_UPS} follow-up questions, each specific and different from what
   was already asked.
-Don't ask for data that doesn't exist (revenue, pre-2026 prices)."""
+Don't ask for data that doesn't exist (revenue, prices before August 2023)."""
 
 
 def plan(history, message: str) -> dict:

@@ -195,3 +195,5 @@ def test_check_citations_rules():
     assert r["cited"] == ["q_11111111"]
     assert set(r["invalid"]) == {"q_22222222", "fare chart 2026-01-04"}  # no fare was looked up
     assert writer.check_citations("[fare chart 2026-01-04]", valid, fares_used=True)["invalid"] == []
+    assert writer.check_citations("[fare chart 2023-08-20, fare chart 2026-01-04]", valid, fares_used=True)["invalid"] == []
+    assert writer.check_citations("[fare chart 2023-08-20]", valid, fares_used=False)["invalid"] == ["fare chart 2023-08-20"]
