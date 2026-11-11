@@ -82,37 +82,30 @@ def test_tool_declarations_match_the_registry():
     assert run_sql.parameters_json_schema["required"] == ["sql", "purpose"]
 
 
-def test_chat_endpoint_keeps_project_1_shape_and_session_memory():
-    fake = FakeGemini([
-        call_response("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "monthly"}),
-        text_response("A Zone 1-7 monthly is $299.75 [fare chart 2026-01-04]."),
-        text_response("Second answer."),
-    ])
-    llm.set_client(fake)
+def test_chat_endpoint_keeps_project_1_shape(monkeypatch):
+    seen = []
+
+    def fake_turn(session_id, message):
+        seen.append(session_id)
+        return "Answer [q_11111111].", [
+            {"agent": "researcher-1", "name": "run_sql", "args": {"sql": "SELECT 1"}, "result": {"rows": [[1]]}},
+        ]
+
+    monkeypatch.setattr(agents, "run_turn", fake_turn)
     client = TestClient(app)
 
-    r = client.post("/chat", json={"message": "What does a zone 7 monthly cost?"})
-    assert r.status_code == 200
-    body = r.json()
+    body = client.post("/chat", json={"message": "How did ten-trip sales change?"}).json()
     assert set(body) == {"response", "session_id", "tool_calls"}
-    assert body["response"].startswith("A Zone 1-7 monthly is $299.75")
-    assert body["tool_calls"][0] == {
-        "agent": agents.single.AGENT_NAME,
-        "name": "lookup_fare",
-        "args": {"origin": "1", "destination": "7", "ticket_type": "monthly"},
-        "result": body["tool_calls"][0]["result"],
-    }
-    assert body["tool_calls"][0]["result"]["fares"][0]["price_usd"] == 299.75
+    assert body["response"] == "Answer [q_11111111]."
+    assert set(body["tool_calls"][0]) == {"agent", "name", "args", "result"}
 
-    # Same session: the earlier question and answer are sent as history.
-    r2 = client.post("/chat", json={"message": "And weekly?", "session_id": body["session_id"]})
-    assert r2.json()["session_id"] == body["session_id"]
-    history = fake.requests[-1]["contents"]
-    assert [c.role for c in history] == ["user", "model", "user"]
-    assert history[0].parts[0].text == "What does a zone 7 monthly cost?"
+    # The same session_id comes back and is passed through on the next message.
+    body2 = client.post("/chat", json={"message": "And weekly?", "session_id": body["session_id"]}).json()
+    assert body2["session_id"] == body["session_id"] == seen[0] == seen[1]
 
 
-def test_chat_endpoint_errors():
+def test_chat_endpoint_errors(monkeypatch):
+    monkeypatch.setattr(llm, "RETRY_WAITS", [])  # don't actually wait in tests
     client = TestClient(app)
     assert client.post("/chat", json={"message": "  "}).status_code == 400
 
@@ -133,3 +126,21 @@ def test_home_page_and_health():
     client = TestClient(app)
     assert client.get("/health").json() == {"status": "ok"}
     assert "LIRR" in client.get("/").text
+
+
+def test_run_agent_retries_after_a_rate_limit(monkeypatch):
+    monkeypatch.setattr(llm, "RETRY_WAITS", [0])
+
+    class FlakyOnce:
+        def __init__(self):
+            self.models, self.calls = self, 0
+
+        def generate_content(self, **_):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("429 RESOURCE_EXHAUSTED")
+            return text_response("ok")
+
+    fake = FlakyOnce()
+    llm.set_client(fake)
+    assert llm.run_agent("a", "s", [llm.user_content("hi")]).text == "ok" and fake.calls == 2
