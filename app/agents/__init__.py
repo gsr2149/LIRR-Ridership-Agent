@@ -1,5 +1,5 @@
-"""The agent behind /chat. Milestone 4 switches this import to the Lead."""
+"""The agent behind /chat: the Lead, which runs Researchers and the Writer."""
 
-from .single import run_turn
+from .lead import run_turn
 
 __all__ = ["run_turn"]
