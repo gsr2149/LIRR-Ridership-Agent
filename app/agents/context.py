@@ -31,3 +31,32 @@ def data_catalog() -> str:
             continue
         lines.append(f"- {table}: " + " ".join(notes[:3]))
     return "\n".join(lines)
+
+
+SCHEMA_TABLES = ["ticket_sales", "daily_ridership", "monthly_ridership", "stop_occupancy", "lirr_fares"]
+MAX_VALUES_SHOWN = 12
+
+
+def schema_brief() -> str:
+    """Columns (and allowed values) of every table, so Researchers can write SQL
+    straight away instead of spending two Gemini calls discovering the schema.
+    describe_table is cached, so this is fast after the first call."""
+    from ..tools.schema import describe_table
+
+    blocks = []
+    for table in SCHEMA_TABLES:
+        info = describe_table(table)
+        if "error" in info:
+            continue
+        cols = []
+        for c in info["columns"]:
+            text = f"{c['column']} {c['type']}"
+            if "values" in c:
+                vals = c["values"][:MAX_VALUES_SHOWN]
+                more = ", ..." if len(c["values"]) > MAX_VALUES_SHOWN else ""
+                text += " (" + ", ".join(repr(v) for v in vals) + more + ")"
+            elif "min" in c:
+                text += f" ({str(c['min'])[:10]} to {str(c['max'])[:10]})"
+            cols.append(text)
+        blocks.append(f"{table}: " + "; ".join(cols))
+    return "\n".join(blocks)

@@ -15,7 +15,9 @@ front end can show the whole process.
 
 from __future__ import annotations
 
+import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from ..llm import ask_json, user_content
@@ -24,7 +26,7 @@ from . import researcher, writer
 from .context import BACKGROUND, data_catalog
 
 AGENT_NAME = "lead"
-MAX_ROUNDS = int(os.environ.get("MAX_RESEARCH_ROUNDS", "3"))         # turn cap
+MAX_ROUNDS = int(os.environ.get("MAX_RESEARCH_ROUNDS", "2"))         # turn cap: 1 plan + 1 follow-up
 MAX_PARALLEL = int(os.environ.get("MAX_PARALLEL_RESEARCHERS", "4"))
 MAX_FOLLOW_UPS = 2
 
@@ -117,6 +119,9 @@ def dispatch(sub_questions: list[str], message: str, start: int) -> list[researc
         return [f.result() for f in futures]  # keep plan order
 
 
+log = logging.getLogger("uvicorn.error")
+
+
 def _lead_entry(name: str, args: dict, result: dict) -> dict:
     return {"agent": AGENT_NAME, "name": name, "args": args, "result": result}
 
@@ -124,9 +129,14 @@ def _lead_entry(name: str, args: dict, result: dict) -> dict:
 def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
     history = get_history(session_id)
     tool_calls: list[dict] = []
+    started = time.perf_counter()
+
+    def mark(step: str) -> None:
+        log.info("research %-28s %5.1fs", step, time.perf_counter() - started)
 
     decision = plan(history, message)
     tool_calls.append(_lead_entry("plan", {"message": message}, decision))
+    mark(f"plan -> {decision['action']}")
 
     if decision["action"] == "clarify":
         reply = decision["question"]
@@ -142,6 +152,7 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
                 {"researchers": [f"researcher-{len(findings) + 1 + i}" for i in range(len(questions))]},
             ))
             new = dispatch(questions, message, start=len(findings) + 1)
+            mark(f"round {round_no}: {len(new)} researchers")
             findings.extend(new)
             for f in new:
                 tool_calls.extend(f.tool_calls)
@@ -153,12 +164,14 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
                 break
             verdict = review(message, findings)
             tool_calls.append(_lead_entry("review", {"round": round_no}, verdict))
+            mark(f"review {round_no} -> {'done' if verdict['done'] else 'follow up'}")
             if verdict["done"]:
                 break
             questions = verdict["follow_up_questions"]
 
         reply, writer_calls = writer.write(message, findings)
         tool_calls.extend(writer_calls)
+        mark("writer")
 
     add_turn(session_id, message, reply)
     return reply, tool_calls

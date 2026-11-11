@@ -7,7 +7,9 @@
 Run locally:  uvicorn app.main:app --reload
 """
 
+import logging
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,7 +25,18 @@ from . import agents  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="LIRR Fare Change Research Agent")
+@asynccontextmanager
+async def lifespan(_app):
+    # Describe every table once at startup, so the first question isn't slow.
+    try:
+        from .agents.context import schema_brief
+        schema_brief()
+    except Exception as e:  # e.g. database not built yet: the app still starts
+        logging.getLogger("uvicorn.error").warning("Schema warm-up skipped: %s", e)
+    yield
+
+
+app = FastAPI(title="LIRR Fare Change Research Agent", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

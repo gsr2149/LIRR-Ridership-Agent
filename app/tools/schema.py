@@ -2,7 +2,27 @@
 
 from __future__ import annotations
 
-from .db import connection, to_json_value
+import copy
+import threading
+
+from .db import connection, db_path, to_json_value
+
+# The data doesn't change while the app runs, so each answer is computed once
+# per database file (describe_table on the 17M-row ticket table takes seconds).
+_cache: dict[tuple, dict] = {}
+_cache_lock = threading.Lock()
+
+
+def _cached(key: tuple, compute) -> dict:
+    full_key = (str(db_path()),) + key
+    with _cache_lock:
+        hit = _cache.get(full_key)
+    if hit is None:
+        hit = compute()
+        if "error" not in hit:
+            with _cache_lock:
+                _cache[full_key] = hit
+    return copy.deepcopy(hit)
 
 # Facts about each table that the column names alone don't tell the model.
 # Keep these short and factual; the agent reads them before writing SQL.
@@ -52,6 +72,10 @@ MAX_LISTED_VALUES = 25
 
 def list_tables() -> dict:
     """Every table with its row count, source dataset, and short notes."""
+    return _cached(("list_tables",), _list_tables)
+
+
+def _list_tables() -> dict:
     cur = connection().cursor()
     names = [r[0] for r in cur.execute("SHOW TABLES").fetchall()]
     src = {
@@ -74,6 +98,10 @@ def list_tables() -> dict:
 
 def describe_table(table: str) -> dict:
     """Columns, types, date ranges and the values of small categorical columns."""
+    return _cached(("describe_table", table), lambda: _describe_table(table))
+
+
+def _describe_table(table: str) -> dict:
     cur = connection().cursor()
     known = {r[0] for r in cur.execute("SHOW TABLES").fetchall()}
     if table not in known:

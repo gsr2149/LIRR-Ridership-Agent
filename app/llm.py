@@ -16,6 +16,7 @@ function calling is off, so we run each tool ourselves and record it).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import time
@@ -29,6 +30,12 @@ from .tools import run_tool, tool_specs
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_ROUNDS = 8
 RETRY_WAITS = [5, 15, 30]  # seconds to wait after a 429/503 before trying again
+# Gemini 2.5 "thinks" before answering, which adds seconds to every call. Our agents
+# get structured prompts and data, so thinking is off by default (0). Set
+# GEMINI_THINKING_BUDGET to e.g. 512 to turn some back on, or "" to use Gemini's default.
+THINKING_BUDGET = os.environ.get("GEMINI_THINKING_BUDGET", "0")
+
+log = logging.getLogger("uvicorn.error")  # shows up in the uvicorn terminal
 
 _client: genai.Client | None = None
 
@@ -91,7 +98,17 @@ def _generate(model: str, contents, config):
         except Exception as e:
             if wait is None or not _is_retryable(e):
                 raise
+            log.warning("Gemini rate limit/busy (%s); waiting %ss before retrying", str(e)[:80], wait)
             time.sleep(wait)
+
+
+def _thinking_config(model: str):
+    if THINKING_BUDGET.strip() == "" or "2.5" not in model:
+        return None
+    budget = int(THINKING_BUDGET)
+    if "pro" in model:
+        budget = max(budget, 128)  # 2.5 Pro can't turn thinking off completely
+    return types.ThinkingConfig(thinking_budget=budget)
 
 
 @dataclass
@@ -134,6 +151,9 @@ def run_agent(
                 )
         if response_json:
             kwargs["response_mime_type"] = "application/json"
+        thinking = _thinking_config(model)
+        if thinking:
+            kwargs["thinking_config"] = thinking
         return types.GenerateContentConfig(**kwargs)
 
     for round_no in range(max_rounds + 1):
