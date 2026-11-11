@@ -51,6 +51,8 @@ def _is_label(text: str, m: re.Match, value: float, unit: str) -> bool:
         return True
     if value.is_integer() and 1990 <= value <= 2035:
         return True                                  # a year
+    if before.endswith(":") or re.match(r":\d|\s?([AaPp]\.?[Mm]\b)", text[m.end():m.end() + 4]):
+        return True                                  # a clock time like 6:00 AM
     if re.match(r"\s*[-–/]\s*\d", text[m.end():m.end() + 3]) and value <= 31:
         return True                                  # a date part like 2026-01-04 or 1/4
     if re.match(r"[-–]\s*(day|week|month|year|trip|zone)", text[m.end():m.end() + 8], re.I):
@@ -134,6 +136,7 @@ def check_numbers(text: str, findings: list[Finding]) -> dict:
             if not qids and not cites_fares:
                 continue                             # background or invalid citation: not checked here
             pool = [v for q in qids for v in by_qid[q]] + (fare_values if cites_fares else [])
+            pool += [v * 100 for v in pool if 0 < abs(v) <= 1.5]   # fractions shown as percents
             key = tuple(sorted(qids)) + (("fares",) if cites_fares else ())
             plain = CITE_RE.sub(lambda m: " " * len(m.group(0)), chunk_text)  # hide citations
             for m in NUM_RE.finditer(plain):

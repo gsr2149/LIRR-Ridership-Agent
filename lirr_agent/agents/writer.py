@@ -33,13 +33,22 @@ user's question using ONLY their findings and query results.
 {BACKGROUND}
 
 Rules:
-- Lead with a 1-2 sentence direct answer, then the supporting evidence (bullets are fine),
-  then a short "What the data can't tell us" part if anything is missing.
+- Write for a rider, not an analyst. Lead with a 1-2 sentence direct answer, then 3-5
+  bullets of supporting evidence, then a "### What the data can't tell us" section
+  (1-3 short bullets) if anything is missing.
+- Plain words: never use table or column names, SQL or codes (say "ticket type", not
+  sold_as; "the TrainTime app", not mobile/device_class_type).
+- Round for readers: percentages to one decimal (23.2%), money to cents or $X.X million,
+  counts with commas. Show shares as percentages, never raw fractions like 0.2315.
+- Compare the same calendar months before and after. When findings disagree because one
+  used different months (e.g. Sep-Dec 2025 vs Jan-Apr 2026), use the same-months finding;
+  if you must mention a different-months number, label it "(different seasons)".
 - Every number must come from the query results or findings given to you, and must be
   followed by its citation in square brackets: a query id like [q_1a2b3c4d], or
   [{FARE_CITATION}] for 2026 prices, [{FARE_CITATION_BEFORE}] for pre-2026 prices from
   fare lookups, or [{BACKGROUND_CITATION}] for the background facts above.
-- Only cite query ids that appear in the material below. Never invent numbers or ids.
+- Only cite query ids that appear in the material below, the two fare charts, or the
+  background. Never cite findings ("Finding R1"), agents or tools. Never invent numbers or ids.
 - If findings conflict or are thin, say so instead of smoothing it over.
 - Don't add a sources list; it is added automatically. Keep it under about 300 words."""
 
@@ -70,19 +79,27 @@ def _material(question: str, findings: list[Finding]) -> str:
 FARE_ALIAS_RE = re.compile(r"^(lookup_fare|fare lookups?|fare chart|fare table|lirr fares?)$", re.I)
 
 
+FINDING_REF_RE = re.compile(r"^(finding\s+)?R\d+$", re.I)
+
+
 def normalize_fare_citations(text: str) -> str:
-    """The model sometimes cites the tool ([lookup_fare]) instead of the chart: cite both charts."""
+    """The model sometimes cites the tool ([lookup_fare]) instead of the chart: cite both charts.
+    References to findings ([Finding R1]) aren't sources a reader can check: drop them."""
     def fix(m: re.Match) -> str:
         tokens = [t.strip() for t in m.group(1).split(",")]
+        if any(FINDING_REF_RE.match(t) for t in tokens):
+            tokens = [t for t in tokens if not FINDING_REF_RE.match(t)]
+            if not tokens:
+                return ""
         if not any(FARE_ALIAS_RE.match(t) for t in tokens):
-            return m.group(0)
+            return f"[{', '.join(tokens)}]"
         out = []
         for t in tokens:
             for new in ([FARE_CITATION_BEFORE, FARE_CITATION] if FARE_ALIAS_RE.match(t) else [t]):
                 if new not in out:
                     out.append(new)
         return f"[{', '.join(out)}]"
-    return CITE_RE.sub(fix, text or "")
+    return re.sub(r" +([.,;:])", r"\1", CITE_RE.sub(fix, text or ""))
 
 
 def check_citations(text: str, valid_ids: set[str], fares_used: bool) -> dict:

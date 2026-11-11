@@ -61,6 +61,22 @@ def station_list() -> list[dict]:
     return [{"name": str(name).strip(), "zone": z} for name, (z, _) in sorted(best.items())]
 
 
+def display_name(place: str, zone: str | None) -> str:
+    """Properly cased station name for what the user typed (typos resolved), or 'Zone N'."""
+    text = str(place).strip()
+    if text.lower().removeprefix("zone").strip() in ZONES:
+        return f"Zone {text.lower().removeprefix('zone').strip()}"
+    try:
+        names = {s["name"].lower(): s["name"] for s in station_list()}
+    except Exception:
+        return text
+    key = text.lower()
+    if key in names:
+        return names[key]
+    close = difflib.get_close_matches(key, names.keys(), n=1, cutoff=0.8)
+    return names[close[0]] if close else text
+
+
 def resolve_zone(place: str | int) -> tuple[str | None, str]:
     """Accept a zone ('7', 7) or a station name ('Hicksville'). Returns (zone, how)."""
     text = str(place).strip()
@@ -138,6 +154,8 @@ def lookup_fare(origin: str, destination: str, ticket_type: str | None = None) -
         "destination": d_how,
         "origin_zone": o_zone,
         "destination_zone": d_zone,
+        "origin_name": display_name(origin, o_zone),
+        "destination_name": display_name(destination, d_zone),
         "fares": fares,
         "notes": notes,
     }

@@ -32,6 +32,27 @@ def _label(v) -> str:
     return s[:10] if DATE_RE.match(s) and s[10:].strip("T :0") == "" else s
 
 
+LEADING_VERB = re.compile(
+    r"^(please\s+)?(calculate|compute|compare|analy[sz]e|examine|get|find|check|count|determine|look at|"
+    r"identify|measure|show|list|investigate|inspect|verify|query|estimate|retrieve|aggregate|sum)\s+(the\s+)?",
+    re.I)
+PLAIN = {"sold_as": "ticket type", "device_class_type": "sales channel", "fare_type": "fare type",
+         "number_of_tickets": "tickets", "daily_ridership": "daily ridership", "ticket_sales": "ticket sales",
+         "stop_occupancy": "train occupancy", "lirr_fares": "fares", "ticket_spend_est": "estimated spending"}
+
+
+def chart_title(purpose: str) -> str:
+    """'Compare ticket sales by sold_as for Feb-Sep...' -> 'Ticket sales by ticket type for Feb-Sep...'"""
+    t = LEADING_VERB.sub("", (purpose or "Query result").strip()).rstrip(".")
+    for code, plain in PLAIN.items():
+        t = re.sub(rf"\b{code}\b", plain, t)
+    t = re.sub(r"\b(type|channel)\s+(type|types|category|categories)\b", r"\1", t)  # "sold_as type"
+    t = t[:1].upper() + t[1:]
+    if len(t) > 80:
+        t = t[:80].rsplit(" ", 1)[0].rstrip(",;:(") + "…"
+    return t
+
+
 def chart_from_query(q: dict) -> dict | None:
     cols, rows = q.get("columns") or [], q.get("rows") or []
     if len(cols) < 2 or not (2 <= len(rows) <= MAX_POINTS * MAX_SERIES):
@@ -81,7 +102,7 @@ def chart_from_query(q: dict) -> dict | None:
     return {
         "query_id": q["query_id"],
         "type": "line" if is_time and len(labels) >= 3 else "bar",
-        "title": (q.get("purpose") or "Query result")[:120],
+        "title": chart_title(q.get("purpose", "")),
         "x": cols[x],
         "labels": labels,
         "series": series,

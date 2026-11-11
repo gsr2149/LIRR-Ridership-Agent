@@ -59,3 +59,16 @@ def test_tool_name_citations_become_fare_chart_citations():
     from lirr_agent.agents.writer import normalize_fare_citations
     assert normalize_fare_citations("up 4.4% [lookup_fare]. [q_aaaaaaaa]") == \
         "up 4.4% [fare chart 2023-08-20, fare chart 2026-01-04]. [q_aaaaaaaa]"
+
+
+def test_clock_times_are_labels_and_fractions_match_percents():
+    rows = [["peak", 0.2315472682174085], ["off_peak", 0.1821]]
+    text = "Between 6:00 AM and 9:59 AM average occupancy was 23.2% [q_aaaaaaaa]."
+    r = check_numbers(text, [_finding(rows)])
+    assert r["unsupported"] == [] and r["checked"] == 1
+
+
+def test_finding_references_are_dropped():
+    from lirr_agent.agents.writer import normalize_fare_citations
+    assert normalize_fare_citations("Peak is 6-10 AM [Finding R1]. Up 3% [q_aaaaaaaa, R2].") == \
+        "Peak is 6-10 AM. Up 3% [q_aaaaaaaa]."

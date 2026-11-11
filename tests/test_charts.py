@@ -37,3 +37,10 @@ def test_wide_charts_skip_change_columns_and_mixed_units():
         ["one_way", 77.2, 92.2, 16.1, 31258499], ["round_trip", 14.1, 0.01, -99.9, 3946],
         ["day_pass", 0.0, 5.9, None, 2000652]]))
     assert [s["name"] for s in spec["series"]] == ["share_pre", "share_post"]
+
+
+def test_chart_titles_are_plain_and_short():
+    from lirr_agent.agents.charts import chart_title
+    assert chart_title("Compare ticket sales by sold_as type before and after the change.") == \
+        "Ticket sales by ticket type before and after the change"
+    assert len(chart_title("Calculate " + "very long words " * 20)) <= 81

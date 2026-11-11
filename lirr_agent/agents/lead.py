@@ -45,14 +45,18 @@ Decide what to do with the user's latest message (earlier messages are context: 
 asked a clarifying question before, the latest message may be the answer to it).
 
 Return JSON with one of these shapes:
-{{"action": "clarify", "question": "..."}}
+{{"action": "clarify", "question": "...", "options": ["...", "...", "..."]}}
   when the question is too vague to research well: it doesn't say what aspect it is about
   (what riders buy, what they pay, how many ride, how crowded trains are) or what to
   compare. Examples: "did things change?", "tell me about the LIRR", "is it worse now?".
-  Ask ONE short question and offer 2-3 concrete options.
-{{"action": "out_of_scope", "reason": "..."}}
+  Ask ONE short question. options = 2-3 complete questions the user could send instead,
+  each one specific and answerable (e.g. "What did riders buy instead of ten-trip tickets?").
+{{"action": "out_of_scope", "reason": "...", "options": ["...", "..."]}}
   when the data cannot answer it at all (other transit systems, events outside 2025-2026,
-  individual riders, anything not in the tables above). Say what CAN be answered instead.
+  individual riders, anything not in the tables above). In 1-2 sentences say why, and give
+  2-3 complete questions this data CAN answer as options.
+Write the question, reason and options for a rider, in plain words: never mention table or
+column names, SQL, or "datasets" by their technical names.
 {{"action": "research", "sub_questions": ["...", "..."]}}
   otherwise. Give 2-{MAX_PARALLEL} specific sub-questions, each answerable with one or two
   SQL queries on the tables above, that together answer the question. Name the table,
@@ -87,6 +91,9 @@ Return JSON:
   - a failed or empty finding, or a claim with no numbers
   - the "so what" is missing: e.g. a ticket disappeared but nothing says what riders
     bought instead, or sales changed but nothing says whether ridership changed too
+  - an unfair comparison: before and after periods that are different calendar months
+    (e.g. Sep-Dec 2025 vs Jan-Apr 2026 mixes seasons). Ask for the same months in both years,
+    e.g. Feb-Sep 2025 vs Feb-Sep 2026
   - a surprise nobody checked: e.g. sales of a discontinued ticket after the change
     date (check by DAY whether they fall before 2026-01-04), or a number that
     contradicts another finding
@@ -98,10 +105,11 @@ Don't ask for data that doesn't exist (revenue, prices before August 2023)."""
 def plan(history, message: str) -> dict:
     decision = ask_json(PLAN_PROMPT, list(history) + [user_content(message)])
     action = decision.get("action")
+    options = [str(o).strip() for o in decision.get("options") or [] if str(o).strip()][:4]
     if action == "clarify" and decision.get("question"):
-        return {"action": "clarify", "question": str(decision["question"])}
+        return {"action": "clarify", "question": str(decision["question"]), "options": options}
     if action == "out_of_scope" and decision.get("reason"):
-        return {"action": "out_of_scope", "reason": str(decision["reason"])}
+        return {"action": "out_of_scope", "reason": str(decision["reason"]), "options": options}
     subs = [str(q) for q in decision.get("sub_questions") or [] if str(q).strip()]
     # Fallback: if the plan is unusable, research the question as asked.
     return {"action": "research", "sub_questions": subs[:MAX_PARALLEL] or [message]}
@@ -153,10 +161,10 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
     tool_calls.append(_lead_entry("plan", {"message": message}, decision))
     mark(f"plan -> {decision['action']}")
 
-    if decision["action"] == "clarify":
-        reply = decision["question"]
-    elif decision["action"] == "out_of_scope":
-        reply = decision["reason"]
+    if decision["action"] in ("clarify", "out_of_scope"):
+        reply = decision["question"] if decision["action"] == "clarify" else decision["reason"]
+        if decision["options"]:
+            reply += "\n\nYou could ask:\n" + "\n".join(f"- {o}" for o in decision["options"])
     else:
         findings: list[researcher.Finding] = []
         questions = decision["sub_questions"]
