@@ -40,6 +40,27 @@ def station_zones() -> dict[str, str]:
     return {str(name).strip().lower(): str(zone) for name, zone in rows}
 
 
+@lru_cache(maxsize=1)
+def station_list() -> list[dict]:
+    """LIRR stations with their fare zone, for the front end's commute picker."""
+    cur = connection().cursor()
+    rows = cur.execute(
+        """SELECT name, zone, sum(n) AS n FROM (
+               SELECT origin_station_name AS name, origin_station_zone AS zone, sum(number_of_tickets) AS n
+               FROM ticket_sales WHERE railroad = 'LIRR' GROUP BY 1, 2
+               UNION ALL
+               SELECT destination_station_name, destination_station_zone, sum(number_of_tickets)
+               FROM ticket_sales WHERE railroad = 'LIRR' GROUP BY 1, 2
+           ) WHERE name IS NOT NULL AND zone IS NOT NULL
+           GROUP BY name, zone ORDER BY name"""
+    ).fetchall()
+    best: dict[str, tuple] = {}
+    for name, zone, n in rows:  # a few stations appear with two zones; keep the common one
+        if str(zone) in ZONES and (name not in best or n > best[name][1]):
+            best[name] = (str(zone), n)
+    return [{"name": str(name).strip(), "zone": z} for name, (z, _) in sorted(best.items())]
+
+
 def resolve_zone(place: str | int) -> tuple[str | None, str]:
     """Accept a zone ('7', 7) or a station name ('Hicksville'). Returns (zone, how)."""
     text = str(place).strip()

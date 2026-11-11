@@ -144,3 +144,26 @@ def test_run_agent_retries_after_a_rate_limit(monkeypatch):
     fake = FlakyOnce()
     llm.set_client(fake)
     assert llm.run_agent("a", "s", [llm.user_content("hi")]).text == "ok" and fake.calls == 2
+
+def test_chat_stream_sends_live_steps_then_the_chat_body(monkeypatch):
+    import json as _json
+    from lirr_agent import events
+
+    def fake_turn(session_id, message):
+        events.phase("planning")
+        events.step({"agent": "lead", "name": "plan", "args": {}, "result": {"action": "research"}})
+        return "Answer.", [{"agent": "lead", "name": "plan", "args": {}, "result": {"action": "research"}}]
+
+    monkeypatch.setattr(agents, "run_turn", fake_turn)
+    with TestClient(app).stream("POST", "/chat/stream", json={"message": "hi"}) as r:
+        lines = [_json.loads(line) for line in r.iter_lines() if line]
+    types_seen = [line["type"] for line in lines]
+    assert types_seen == ["start", "phase", "step", "done"]
+    assert set(lines[-1]) == {"type", "response", "session_id", "tool_calls"}
+
+
+def test_fare_endpoints(fake_db):
+    client = TestClient(app)
+    assert {"name": "Hicksville", "zone": "7"} in client.get("/api/stations").json()["stations"]
+    body = client.get("/api/fare", params={"origin": "Penn Station", "destination": "Hicksville"}).json()
+    assert body["destination_zone"] == "7" and body["fares"]

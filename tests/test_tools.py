@@ -41,9 +41,11 @@ def fake_db(tmp_path, monkeypatch):
     monkeypatch.setenv("LIRR_DB_PATH", str(path))
     db.reset_connection()
     fares.station_zones.cache_clear()
+    fares.station_list.cache_clear()
     yield
     db.reset_connection()
     fares.station_zones.cache_clear()
+    fares.station_list.cache_clear()
 
 
 # ---- registry ---------------------------------------------------------------

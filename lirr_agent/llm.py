@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from google import genai
 from google.genai import types
 
+from . import events
 from .tools import run_tool, tool_specs
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
@@ -50,7 +51,13 @@ def client() -> genai.Client:
             # Cloud Run: Gemini through Vertex AI, billed to the GCP project and
             # authenticated as the service account (no API key). Reads
             # GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION (use "global").
-            _client = genai.Client(http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS))
+            credentials = None
+            if os.environ.get("GOOGLE_OAUTH_ACCESS_TOKEN"):  # local dev: `gcloud auth print-access-token`
+                from google.oauth2.credentials import Credentials
+
+                credentials = Credentials(os.environ["GOOGLE_OAUTH_ACCESS_TOKEN"])
+            _client = genai.Client(credentials=credentials,
+                                   http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS))
         else:
             # Gemini API key (GEMINI_API_KEY). Tool calling needs the v1beta API;
             # newer SDK versions default to v1, which rejects tools.
@@ -182,7 +189,9 @@ def run_agent(
         for call in calls:
             args = dict(call.args or {})
             result = run_tool(call.name, args)
-            tool_calls.append({"agent": agent, "name": call.name, "args": args, "result": result})
+            entry = {"agent": agent, "name": call.name, "args": args, "result": result}
+            tool_calls.append(entry)
+            events.step(entry)
             parts.append(types.Part.from_function_response(name=call.name, response=result))
         contents.append(types.Content(role="user", parts=parts))
 

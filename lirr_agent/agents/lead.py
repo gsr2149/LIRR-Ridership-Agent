@@ -16,10 +16,12 @@ front end can show the whole process.
 from __future__ import annotations
 
 import logging
+import contextvars
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from .. import events
 from ..llm import ask_json, user_content
 from ..sessions import add_turn, get_history
 from . import researcher, writer
@@ -116,8 +118,16 @@ def review(message: str, findings: list[researcher.Finding]) -> dict:
 def dispatch(sub_questions: list[str], message: str, start: int) -> list[researcher.Finding]:
     """Run one Researcher per sub-question at the same time."""
     jobs = [(f"R{start + i}", f"researcher-{start + i}", q) for i, q in enumerate(sub_questions)]
+    def run_one(fid: str, agent: str, q: str) -> researcher.Finding:
+        events.emit({"type": "researcher_start", "agent": agent, "sub_question": q})
+        finding = researcher.research(fid, agent, q, message)
+        events.step({"agent": agent, "name": "report_finding", "args": {"sub_question": q},
+                     "result": {"summary": finding.summary}})
+        return finding
+
     with ThreadPoolExecutor(max_workers=min(MAX_PARALLEL, len(jobs))) as pool:
-        futures = [pool.submit(researcher.research, fid, agent, q, message) for fid, agent, q in jobs]
+        # copy_context: each thread sees this request's event stream (see events.py)
+        futures = [pool.submit(contextvars.copy_context().run, run_one, fid, agent, q) for fid, agent, q in jobs]
         return [f.result() for f in futures]  # keep plan order
 
 
@@ -125,7 +135,9 @@ log = logging.getLogger("uvicorn.error")
 
 
 def _lead_entry(name: str, args: dict, result: dict) -> dict:
-    return {"agent": AGENT_NAME, "name": name, "args": args, "result": result}
+    entry = {"agent": AGENT_NAME, "name": name, "args": args, "result": result}
+    events.step(entry)
+    return entry
 
 
 def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
@@ -136,6 +148,7 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
     def mark(step: str) -> None:
         log.info("research %-28s %5.1fs", step, time.perf_counter() - started)
 
+    events.phase("planning")
     decision = plan(history, message)
     tool_calls.append(_lead_entry("plan", {"message": message}, decision))
     mark(f"plan -> {decision['action']}")
@@ -153,6 +166,7 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
                 {"round": round_no, "sub_questions": questions},
                 {"researchers": [f"researcher-{len(findings) + 1 + i}" for i in range(len(questions))]},
             ))
+            events.phase("researching", round=round_no)
             new = dispatch(questions, message, start=len(findings) + 1)
             mark(f"round {round_no}: {len(new)} researchers")
             findings.extend(new)
@@ -164,6 +178,7 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
                 tool_calls.append(_lead_entry("review", {"round": round_no},
                                               {"done": True, "reason": f"Reached the {MAX_ROUNDS}-round cap."}))
                 break
+            events.phase("reviewing", round=round_no)
             verdict = review(message, findings)
             tool_calls.append(_lead_entry("review", {"round": round_no}, verdict))
             mark(f"review {round_no} -> {'done' if verdict['done'] else 'follow up'}")
@@ -171,8 +186,11 @@ def run_turn(session_id: str, message: str) -> tuple[str, list[dict]]:
                 break
             questions = verdict["follow_up_questions"]
 
+        events.phase("writing")
         reply, writer_calls = writer.write(message, findings)
         tool_calls.extend(writer_calls)
+        for entry in writer_calls:
+            events.step(entry)
         mark("writer")
 
     add_turn(session_id, message, reply)
