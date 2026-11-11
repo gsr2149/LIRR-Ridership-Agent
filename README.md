@@ -261,7 +261,7 @@ crowded after the fare increase?", "Did things change?" (to see a clarifying que
 
 ```bash
 uv sync
-uv run pytest -q                 # 47 tests, with a fake Gemini; no API key needed
+uv run pytest -q                 # 50 tests, with a fake Gemini; no API key needed
 ```
 
 Put the database at `data/lirr.duckdb` (build it as above, or copy it from the bucket with
