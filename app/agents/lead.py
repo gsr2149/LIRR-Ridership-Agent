@@ -50,10 +50,21 @@ Return JSON with one of these shapes:
   when the data cannot answer it at all (other transit systems, events outside 2025-2026,
   individual riders, anything not in the tables above). Say what CAN be answered instead.
 {{"action": "research", "sub_questions": ["...", "..."]}}
-  otherwise. Give 2-{MAX_PARALLEL} specific, independent sub-questions, each answerable with
-  one or two SQL queries on the tables above, that together answer the question. Name
-  the table, the comparison (e.g. Feb-Sep 2025 vs Feb-Sep 2026) and the measure.
-  Prefer researching over clarifying when the question is reasonably clear."""
+  otherwise. Give 2-{MAX_PARALLEL} specific sub-questions, each answerable with one or two
+  SQL queries on the tables above, that together answer the question. Name the table,
+  the comparison (e.g. Feb-Sep 2025 vs Feb-Sep 2026) and the measure.
+  Prefer researching over clarifying when the question is reasonably clear.
+
+Good plans cover DIFFERENT ANGLES, never the same measure for different months (one
+Researcher can compare several months in one query). For a question about a ticket or
+fare change, the usual angles are:
+  1. the direct effect: that ticket's sales before vs after, by month or around 2026-01-04
+  2. substitution: how the share of the OTHER ticket types (sold_as) changed over the
+     same months, i.e. what riders bought instead
+  3. how riders buy: the mix of device_class_type (mobile app, machines, onboard) before vs after
+  4. context: LIRR ridership over the same months, to separate "fewer riders" from
+     "riders switched tickets"; or 2026 prices from lookup_fare for what riders pay now
+Pick the angles that fit the question."""
 
 REVIEW_PROMPT = f"""You are the Lead of a research team studying the LIRR fare and ticketing
 changes of January 4, 2026. Researchers have answered sub-questions. Decide whether the
@@ -66,8 +77,15 @@ Return JSON:
 {{"done": true, "reason": "..."}}  if the findings answer the question (or the data
   simply can't answer the rest, which the Writer will say), or
 {{"done": false, "reason": "...", "follow_up_questions": ["..."]}}  if there is a gap that
-  one more query could fill: a failed or empty finding, a claim with no numbers, or an
-  obvious missing comparison. At most {MAX_FOLLOW_UPS} follow-up questions, each specific.
+  one more query could fill. Gaps to look for:
+  - a failed or empty finding, or a claim with no numbers
+  - the "so what" is missing: e.g. a ticket disappeared but nothing says what riders
+    bought instead, or sales changed but nothing says whether ridership changed too
+  - a surprise nobody checked: e.g. sales of a discontinued ticket after the change
+    date (check by DAY whether they fall before 2026-01-04), or a number that
+    contradicts another finding
+  At most {MAX_FOLLOW_UPS} follow-up questions, each specific and different from what
+  was already asked.
 Don't ask for data that doesn't exist (revenue, pre-2026 prices)."""
 
 
