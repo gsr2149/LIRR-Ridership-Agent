@@ -1,5 +1,5 @@
-"""Gemini tool-calling loop shared by every agent (same approach as Project 1:
-automatic function calling is off, so we run each tool ourselves and record it).
+"""Gemini calls shared by every agent (same approach as Project 1: automatic
+function calling is off, so we run each tool ourselves and record it).
 
     result = run_agent(
         agent="researcher-1",
@@ -9,11 +9,16 @@ automatic function calling is off, so we run each tool ourselves and record it).
     )
     result.text        # the model's final answer
     result.tool_calls  # [{"agent", "name", "args", "result"}, ...]
+
+    plan = ask_json(system="...", contents=[...])   # a dict parsed from JSON
 """
 
 from __future__ import annotations
 
+import json
 import os
+import re
+import time
 from dataclasses import dataclass, field
 
 from google import genai
@@ -23,6 +28,7 @@ from .tools import run_tool, tool_specs
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 DEFAULT_MAX_ROUNDS = 8
+RETRY_WAITS = [5, 15, 30]  # seconds to wait after a 429/503 before trying again
 
 _client: genai.Client | None = None
 
@@ -67,6 +73,27 @@ def gemini_tools(tool_names: list[str] | None) -> list[types.Tool]:
     return [types.Tool(function_declarations=decls)]
 
 
+def _is_retryable(e: Exception) -> bool:
+    msg = str(e)
+    return any(s in msg for s in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"))
+
+
+def _generate(model: str, contents, config):
+    """generate_content with a few retries when Gemini says 'slow down'.
+
+    Several Researchers run at once, so the free tier's per-minute limit is
+    easy to hit; waiting a bit usually fixes it. A daily limit will still fail
+    after the retries, and /chat turns that into a 429 for the user.
+    """
+    for wait in RETRY_WAITS + [None]:
+        try:
+            return client().models.generate_content(model=model, contents=contents, config=config)
+        except Exception as e:
+            if wait is None or not _is_retryable(e):
+                raise
+            time.sleep(wait)
+
+
 @dataclass
 class AgentResult:
     text: str
@@ -81,6 +108,7 @@ def run_agent(
     tool_names: list[str] | None = None,
     max_rounds: int = DEFAULT_MAX_ROUNDS,
     response_json: bool = False,
+    model: str | None = None,
 ) -> AgentResult:
     """Call Gemini, run any tools it asks for, repeat until it answers in text.
 
@@ -91,6 +119,7 @@ def run_agent(
     contents = list(contents)
     tool_calls: list[dict] = []
     tools = gemini_tools(tool_names)
+    model = model or MODEL
 
     def config(allow_tools: bool) -> types.GenerateContentConfig:
         kwargs = {
@@ -109,9 +138,7 @@ def run_agent(
 
     for round_no in range(max_rounds + 1):
         allow_tools = round_no < max_rounds
-        response = client().models.generate_content(
-            model=MODEL, contents=contents, config=config(allow_tools)
-        )
+        response = _generate(model, contents, config(allow_tools))
         calls = (response.function_calls or []) if allow_tools else []
         if not calls:
             return AgentResult(text=_text(response), tool_calls=tool_calls, contents=contents)
@@ -126,6 +153,31 @@ def run_agent(
         contents.append(types.Content(role="user", parts=parts))
 
     return AgentResult(text="", tool_calls=tool_calls, contents=contents)  # not reached
+
+
+def ask_json(system: str, contents: list[types.Content], model: str | None = None) -> dict:
+    """One Gemini call (no tools) that must answer with a JSON object."""
+    result = run_agent("json", system, contents, tool_names=None, response_json=True, model=model)
+    return parse_json(result.text)
+
+
+def parse_json(text: str) -> dict:
+    """Parse a JSON object from model output, tolerating ```json fences or extra prose."""
+    text = (text or "").strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fenced:
+        text = fenced.group(1).strip()
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start == -1 or end <= start:
+            return {}
+        try:
+            value = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _text(response) -> str:
