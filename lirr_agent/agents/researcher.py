@@ -12,7 +12,7 @@ import os
 from dataclasses import dataclass, field
 
 from ..llm import run_agent, user_content
-from .context import BACKGROUND, DATA_RULES, schema_brief
+from .context import BACKGROUND, DATA_RULES, schema_brief, station_zone_brief
 
 RESEARCHER_MODEL = os.environ.get("RESEARCHER_MODEL") or None  # None = same as GEMINI_MODEL
 MAX_TOOL_ROUNDS = 8
@@ -61,7 +61,8 @@ def research(finding_id: str, agent: str, sub_question: str, user_question: str)
         f"(For context only, the user's overall question was: {user_question})"
     )
     try:
-        system = SYSTEM_PROMPT + "\n\nTables and columns:\n" + schema_brief()
+        system = (SYSTEM_PROMPT + "\n\nTables and columns:\n" + schema_brief()
+                  + "\n\nLIRR station fare zones (from the ticket data):\n" + station_zone_brief())
         result = run_agent(agent, system, [user_content(prompt)], TOOL_NAMES,
                            max_rounds=MAX_TOOL_ROUNDS, model=RESEARCHER_MODEL)
         summary = result.text or "FINDING: (no answer)\nLIMITS: the researcher returned nothing."

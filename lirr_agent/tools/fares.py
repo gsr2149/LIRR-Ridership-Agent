@@ -54,8 +54,20 @@ def station_list() -> list[dict]:
            ) WHERE name IS NOT NULL AND zone IS NOT NULL
            GROUP BY name, zone ORDER BY name"""
     ).fetchall()
+    # Metro-North stations (e.g. Bronxville) turn up in a few LIRR rows; keep stations whose
+    # tickets are mostly LIRR.
+    mostly_mnr = {r[0] for r in cur.execute(
+        """SELECT name FROM (
+               SELECT origin_station_name AS name, railroad, number_of_tickets AS n FROM ticket_sales
+               UNION ALL
+               SELECT destination_station_name, railroad, number_of_tickets FROM ticket_sales
+           ) GROUP BY name
+           HAVING sum(n) FILTER (WHERE railroad = 'MNR') > sum(n) FILTER (WHERE railroad = 'LIRR')"""
+    ).fetchall()}
     best: dict[str, tuple] = {}
     for name, zone, n in rows:  # a few stations appear with two zones; keep the common one
+        if name in mostly_mnr and name != "Grand Central":
+            continue
         if str(zone) in ZONES and (name not in best or n > best[name][1]):
             best[name] = (str(zone), n)
     return [{"name": str(name).strip(), "zone": z} for name, (z, _) in sorted(best.items())]

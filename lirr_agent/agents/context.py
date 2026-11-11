@@ -29,6 +29,8 @@ DATA_RULES = f"""Data rules:
   vs Feb-Sep 2026), leaving out the transition weeks around 2026-01-04. Give shares
   (percent of LIRR tickets) as well as counts.
 - Ticket sales and occupancy cover 2025-01-01 to 2026-09-30 in this database.
+- Never assume which zone a station is in: use the station zone list below, or
+  lookup_fare (it resolves station names). Huntington, for example, is zone 9, not 7.
 - Prices from lookup_fare are cited by the chart they come from: [{FARE_CITATION}] for
   2026 prices, [{FARE_CITATION_BEFORE}] for pre-2026 prices (cite both for a change)."""
 
@@ -71,3 +73,18 @@ def schema_brief() -> str:
             cols.append(text)
         blocks.append(f"{table}: " + "; ".join(cols))
     return "\n".join(blocks)
+
+
+def station_zone_brief() -> str:
+    """Every LIRR station's fare zone, grouped by zone, so no agent has to guess one."""
+    from ..tools.fares import station_list
+
+    try:
+        stations = station_list()
+    except Exception:
+        return ""
+    by_zone: dict[str, list[str]] = {}
+    for s in stations:
+        by_zone.setdefault(s["zone"], []).append(s["name"])
+    zones = sorted(by_zone, key=int)
+    return "\n".join(f"Zone {z}: " + ", ".join(by_zone[z]) for z in zones)
