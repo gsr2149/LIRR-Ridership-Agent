@@ -1,4 +1,5 @@
-"""lookup_fare: January 2026 LIRR fares between two zones or stations."""
+"""lookup_fare: LIRR fares between two zones or stations, before and after the
+January 4, 2026 fare change, with the percent change for each ticket type."""
 
 from __future__ import annotations
 
@@ -11,11 +12,15 @@ ZONES = ["1", "3", "4", "7", "9", "10", "12", "14"]
 TICKET_TYPES = [
     "monthly", "weekly", "one_way_peak", "one_way_offpeak", "one_way_senior_disabled",
     "day_pass_weekday", "day_pass_weekend", "onboard_one_way_peak", "onboard_one_way_offpeak",
+    "ten_trip_peak", "ten_trip_offpeak", "ten_trip_senior_disabled",
 ]
+DISCONTINUED = {"ten_trip_peak", "ten_trip_offpeak", "ten_trip_senior_disabled"}
+NEW_IN_2026 = {"day_pass_weekday", "day_pass_weekend"}
 NOT_IN_TABLE = {
-    "ten_trip": "Ten-trip tickets were discontinued in January 2026; the fare table has no ten-trip price.",
-    "round_trip": "Round-trip tickets were replaced by the Day Pass in January 2026; see day_pass_weekday / day_pass_weekend.",
+    "round_trip": "Round-trip tickets were replaced by the Day Pass on 2026-01-04 and neither fare chart "
+                  "lists a round-trip price; see day_pass_weekday / day_pass_weekend.",
 }
+PERIODS = {"pre_2026": "2023-08-20", "post_2026": "2026-01-04"}
 
 
 @lru_cache(maxsize=1)
@@ -58,7 +63,8 @@ def resolve_zone(place: str | int) -> tuple[str | None, str]:
 
 
 def lookup_fare(origin: str, destination: str, ticket_type: str | None = None) -> dict:
-    """Fares effective 2026-01-04 between two zones/stations, for one or all ticket types."""
+    """Fares between two zones/stations: before (effective 2023-08-20) and after
+    (effective 2026-01-04) the fare change, for one or all ticket types."""
     o_zone, o_how = resolve_zone(origin)
     d_zone, d_how = resolve_zone(destination)
     if o_zone is None or d_zone is None:
@@ -66,30 +72,51 @@ def lookup_fare(origin: str, destination: str, ticket_type: str | None = None) -
 
     if ticket_type:
         ticket_type = ticket_type.strip().lower()
+        if ticket_type == "ten_trip":
+            ticket_type = "ten_trip_peak"
         for prefix, msg in NOT_IN_TABLE.items():
             if ticket_type.startswith(prefix):
                 return {"error": msg, "available_ticket_types": TICKET_TYPES}
         if ticket_type not in TICKET_TYPES:
             return {"error": f"Unknown ticket_type '{ticket_type}'.", "available_ticket_types": TICKET_TYPES}
 
-    sql = ("SELECT ticket_type, price_usd, effective_date, source_doc FROM lirr_fares "
+    sql = ("SELECT fare_period, ticket_type, price_usd FROM lirr_fares "
            "WHERE origin_zone = ? AND dest_zone = ?")
     params: list = [o_zone, d_zone]
     if ticket_type:
         sql += " AND ticket_type = ?"
         params.append(ticket_type)
-    sql += " ORDER BY ticket_type"
+    prices: dict[str, dict[str, float]] = {}
+    for period, t, p in connection().cursor().execute(sql, params).fetchall():
+        prices.setdefault(t, {})[period] = to_json_value(p)
 
-    rows = connection().cursor().execute(sql, params).fetchall()
+    fares = []
+    for t in [t for t in TICKET_TYPES if t in prices]:
+        before, after = prices[t].get("pre_2026"), prices[t].get("post_2026")
+        row = {"ticket_type": t, "price_before_usd": before, "price_after_usd": after}
+        if before is not None and after is not None:
+            row["change_pct"] = round((after - before) / before * 100, 1)
+        elif t in DISCONTINUED:
+            row["status"] = "discontinued 2026-01-04 (last price shown)"
+        elif t in NEW_IN_2026:
+            row["status"] = "new on 2026-01-04 (replaced the round-trip ticket)"
+        else:
+            row["status"] = "no pre-2026 price for this zone pair in the 2023 fare table"
+        fares.append(row)
+
+    notes = ["Before = fares effective 2023-08-20 (in force until 2026-01-03). "
+             "After = fares effective 2026-01-04."]
+    if o_zone in ("1", "3") and d_zone in ("1", "3"):
+        notes.append("Trips within New York City (zones 1 and 3 to zone 1): before-2026 one-way prices are "
+                     "the CityTicket fares ($7 peak, $5 off-peak).")
+    if not any(f["price_before_usd"] for f in fares):
+        notes.append("The 2023 fare table only covers trips to/from zone 1 and some trips to/from zones 3, 4 "
+                     "and 7, so this zone pair has no pre-2026 prices.")
     return {
         "origin": o_how,
         "destination": d_how,
         "origin_zone": o_zone,
         "destination_zone": d_zone,
-        "fares": [
-            {"ticket_type": t, "price_usd": to_json_value(p), "effective_date": to_json_value(e)}
-            for t, p, e, _ in rows
-        ],
-        "source_doc": rows[0][3] if rows else None,
-        "note": "Prices effective 2026-01-04. No pre-2026 prices are in this database.",
+        "fares": fares,
+        "notes": notes,
     }

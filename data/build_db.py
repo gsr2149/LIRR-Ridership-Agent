@@ -2,9 +2,10 @@
 
 Usage (from the repo root, after data/fetch.py):
     python data/build_db.py
+    python data/build_db.py --fares-only   # reload lirr_fares.csv and rebuild ticket_spend_est only
 
 Creates:
-    data/lirr.duckdb   one table per dataset + `lirr_fares` + `sources` (git-ignored)
+    data/lirr.duckdb   one table per dataset + `lirr_fares` + `ticket_spend_est` + `sources` (git-ignored)
     data/SCHEMA.md     tables, columns, date ranges, common values (commit this:
                        you will paste it into the agent's system prompt later)
 """
@@ -97,11 +98,76 @@ def load_fares(con: duckdb.DuckDBPyConnection) -> bool:
            FROM lirr_fares"""
     )
     con.execute(
+        "DELETE FROM sources WHERE table_name = 'lirr_fares'"
+    )
+    con.execute(
         "INSERT INTO sources VALUES ('lirr_fares', NULL, 'LIRR fare tables (hand-entered from MTA PDFs)', "
         "NULL, NULL, ?, ?)",
         [datetime.now(timezone.utc).isoformat(timespec="seconds"), n],
     )
     print(f"  lirr_fares: {n:,} rows")
+    return True
+
+
+# How each ticket sale maps to a fare (see SPEND_NOTES in lirr_agent/tools/schema.py).
+# Found by inspecting the data: every ten_trip count is a multiple of 10 (the dataset counts
+# RIDES, ten per ten-trip ticket), and round trips are mostly counted per leg.
+SPEND_SQL = """
+CREATE OR REPLACE TABLE ticket_spend_est AS
+WITH sales AS (
+    SELECT CAST(date AS DATE) AS date, sold_as, fare_type, ticket_type AS sales_ticket_type,
+           CAST(origin_station_zone AS VARCHAR) AS origin_zone,
+           CAST(destination_station_zone AS VARCHAR) AS dest_zone,
+           sum(number_of_tickets) AS tickets
+    FROM ticket_sales WHERE railroad = 'LIRR'
+    GROUP BY ALL
+), mapped AS (
+    SELECT *,
+        CASE WHEN date < DATE '2026-01-04' THEN 'pre_2026' ELSE 'post_2026' END AS fare_period,
+        CASE
+            WHEN sold_as IN ('monthly', 'monthly_bundled') THEN 'monthly'
+            WHEN sold_as = 'weekly' THEN 'weekly'
+            WHEN sold_as = 'ten_trip' THEN
+                CASE fare_type WHEN 'peak' THEN 'ten_trip_peak' WHEN 'off_peak' THEN 'ten_trip_offpeak'
+                               WHEN 'half' THEN 'ten_trip_senior_disabled' END
+            WHEN sold_as = 'day_pass' THEN
+                CASE WHEN sales_ticket_type ILIKE '%weekend%' THEN 'day_pass_weekend'
+                     WHEN sales_ticket_type ILIKE '%weekday%' THEN 'day_pass_weekday'
+                     WHEN dayofweek(date) IN (0, 6) THEN 'day_pass_weekend'
+                     ELSE 'day_pass_weekday' END
+            WHEN sold_as IN ('one_way', 'one_way_bundled', 'round_trip', 'round_trip_bundled') THEN
+                CASE fare_type WHEN 'peak' THEN 'one_way_peak' WHEN 'off_peak' THEN 'one_way_offpeak'
+                               WHEN 'half' THEN 'one_way_senior_disabled' END
+        END AS price_ticket_type,
+        CASE WHEN sold_as = 'ten_trip' THEN tickets / 10.0 ELSE tickets END AS units_priced
+    FROM sales
+)
+SELECT m.date, m.fare_period, m.sold_as, m.fare_type, m.origin_zone, m.dest_zone,
+       m.price_ticket_type, m.tickets, m.units_priced, f.price_usd,
+       CAST(m.units_priced * f.price_usd AS DOUBLE) AS est_spend_usd
+FROM mapped m
+LEFT JOIN lirr_fares f
+  ON f.fare_period = m.fare_period AND f.origin_zone = m.origin_zone
+ AND f.dest_zone = m.dest_zone AND f.ticket_type = m.price_ticket_type
+"""
+
+
+def build_spend(con: duckdb.DuckDBPyConnection) -> bool:
+    tables = {r[0] for r in con.execute("SELECT table_name FROM information_schema.tables").fetchall()}
+    if not {"ticket_sales", "lirr_fares"} <= tables:
+        print("  SKIP ticket_spend_est: needs ticket_sales and lirr_fares")
+        return False
+    con.execute(SPEND_SQL)
+    n, share = con.execute(
+        "SELECT count(*), sum(tickets) FILTER (WHERE price_usd IS NOT NULL) / sum(tickets) FROM ticket_spend_est"
+    ).fetchone()
+    con.execute("DELETE FROM sources WHERE table_name = 'ticket_spend_est'")
+    con.execute(
+        "INSERT INTO sources VALUES ('ticket_spend_est', NULL, 'Estimated spending: LIRR ticket_sales x lirr_fares "
+        "(built by data/build_db.py)', NULL, NULL, ?, ?)",
+        [datetime.now(timezone.utc).isoformat(timespec="seconds"), n],
+    )
+    print(f"  ticket_spend_est: {n:,} rows, {share:.1%} of tickets priced")
     return True
 
 
@@ -137,17 +203,26 @@ def describe_table(con: duckdb.DuckDBPyConnection, table: str) -> list[str]:
 
 
 def main() -> int:
-    DB_PATH.unlink(missing_ok=True)
-    con = duckdb.connect(str(DB_PATH))
-    con.execute(
-        """CREATE TABLE sources (table_name VARCHAR, dataset_id VARCHAR, title VARCHAR,
-           url VARCHAR, row_filter VARCHAR, fetched_at VARCHAR, row_count BIGINT)"""
-    )
-
-    print("Loading tables into", DB_PATH.name)
-    loaded = [k for k in TABLE_KEYS if load_dataset(con, k)]
-    if load_fares(con):
-        loaded.append("lirr_fares")
+    if "--fares-only" in sys.argv:
+        con = duckdb.connect(str(DB_PATH))
+        print("Reloading lirr_fares in", DB_PATH.name)
+        load_fares(con)
+        build_spend(con)
+        tables = {r[0] for r in con.execute("SELECT table_name FROM sources").fetchall()}
+        loaded = [k for k in TABLE_KEYS + ["lirr_fares", "ticket_spend_est"] if k in tables]
+    else:
+        DB_PATH.unlink(missing_ok=True)
+        con = duckdb.connect(str(DB_PATH))
+        con.execute(
+            """CREATE TABLE sources (table_name VARCHAR, dataset_id VARCHAR, title VARCHAR,
+               url VARCHAR, row_filter VARCHAR, fetched_at VARCHAR, row_count BIGINT)"""
+        )
+        print("Loading tables into", DB_PATH.name)
+        loaded = [k for k in TABLE_KEYS if load_dataset(con, k)]
+        if load_fares(con):
+            loaded.append("lirr_fares")
+        if build_spend(con):
+            loaded.append("ticket_spend_est")
 
     lines = [
         "# Database schema",

@@ -29,7 +29,9 @@ def fake_db(tmp_path, monkeypatch):
     con.execute("""CREATE TABLE lirr_fares AS SELECT * FROM (VALUES
           ('post_2026', DATE '2026-01-04', '1', '7', 'monthly', 299.75::DECIMAL(8,2), 'chart.pdf'),
           ('post_2026', DATE '2026-01-04', '1', '7', 'one_way_peak', 15.25::DECIMAL(8,2), 'chart.pdf'),
-          ('post_2026', DATE '2026-01-04', '7', '1', 'monthly', 299.75::DECIMAL(8,2), 'chart.pdf')
+          ('post_2026', DATE '2026-01-04', '7', '1', 'monthly', 299.75::DECIMAL(8,2), 'chart.pdf'),
+          ('pre_2026', DATE '2023-08-20', '1', '7', 'monthly', 287.00::DECIMAL(8,2), 'old.pdf'),
+          ('pre_2026', DATE '2023-08-20', '1', '7', 'ten_trip_peak', 145.00::DECIMAL(8,2), 'old.pdf')
         ) AS t(fare_period, effective_date, origin_zone, dest_zone, ticket_type, price_usd, source_doc)""")
     con.execute("""CREATE TABLE sources AS SELECT 'ticket_sales' AS table_name, '5ypk-fceg' AS dataset_id,
           'MTA Railroad Ticket Sales' AS title, 'https://data.ny.gov/d/5ypk-fceg' AS url,
@@ -129,14 +131,23 @@ def test_run_sql_caps_rows(monkeypatch):
 def test_lookup_fare_by_zone_and_by_station():
     by_zone = run_tool("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "monthly"})
     by_name = run_tool("lookup_fare", {"origin": "penn station", "destination": "Hicksvile"})  # typo on purpose
-    assert by_zone["fares"] == [{"ticket_type": "monthly", "price_usd": 299.75, "effective_date": "2026-01-04"}]
+    assert by_zone["fares"] == [{"ticket_type": "monthly", "price_before_usd": 287.0,
+                                 "price_after_usd": 299.75, "change_pct": 4.4}]
     assert by_name["destination_zone"] == "7"
-    assert {f["ticket_type"] for f in by_name["fares"]} == {"monthly", "one_way_peak"}
-    assert by_name["source_doc"] == "chart.pdf"
+    assert {f["ticket_type"] for f in by_name["fares"]} == {"monthly", "one_way_peak", "ten_trip_peak"}
+
+
+def test_lookup_fare_marks_discontinued_and_missing_prices():
+    fares_by_type = {f["ticket_type"]: f for f in run_tool("lookup_fare", {"origin": "1", "destination": "7"})["fares"]}
+    assert fares_by_type["ten_trip_peak"]["price_after_usd"] is None
+    assert "discontinued" in fares_by_type["ten_trip_peak"]["status"]
+    assert "no pre-2026 price" in fares_by_type["one_way_peak"]["status"]
+    ten = run_tool("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "ten_trip"})
+    assert ten["fares"][0]["price_before_usd"] == 145.0
 
 
 def test_lookup_fare_explains_what_it_cannot_answer():
-    assert "discontinued" in run_tool("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "ten_trip"})["error"]
+    assert "Day Pass" in run_tool("lookup_fare", {"origin": "1", "destination": "7", "ticket_type": "round_trip"})["error"]
     assert "not an LIRR fare zone" in run_tool("lookup_fare", {"origin": "2", "destination": "7"})["error"]
     assert "Unknown LIRR station" in run_tool("lookup_fare", {"origin": "Narnia", "destination": "7"})["error"]
 

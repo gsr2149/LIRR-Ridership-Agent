@@ -38,6 +38,9 @@ TABLE_NOTES: dict[str, list[str]] = {
         "origin_station_zone / destination_station_zone are LIRR fare zones (1, 3, 4, 7, 9, 10, 12, 14); "
         "join to lirr_fares on CAST(zone AS VARCHAR).",
         "Covers 2025-01-01 to 2026-09-30 in this database. The fare change took effect 2026-01-04.",
+        "Counting quirk: ten_trip rows count RIDES (10 per ten-trip ticket; every count is a multiple "
+        "of 10) and round trips are mostly counted per leg, so counts are closer to rides than purchases.",
+        "For day passes, ticket_type says 'Day Pass Weekday' or 'Day Pass Weekend'.",
         "17M+ rows: aggregate (GROUP BY) instead of selecting raw rows.",
     ],
     "daily_ridership": [
@@ -55,12 +58,33 @@ TABLE_NOTES: dict[str, list[str]] = {
         "Covers 2025-01-01 to 2026-09-30 in this database. ~5M rows: aggregate.",
     ],
     "lirr_fares": [
-        "LIRR station fares effective 2026-01-04 ONLY. There are no pre-2026 prices in this database, "
-        "so price changes per ticket cannot be computed from it.",
+        "LIRR station fares in two periods: fare_period = 'pre_2026' (effective 2023-08-20, in force until "
+        "2026-01-03) and 'post_2026' (effective 2026-01-04). Join the two on origin_zone, dest_zone, "
+        "ticket_type to compute price changes.",
+        "post_2026 covers every zone pair. pre_2026 covers every pair to/from zone 1 (84% of 2025 LIRR "
+        "tickets) plus 3<->3, 3<->4, 3<->7, 4<->7, 3<->9, 4<->9, 7<->9, 3<->10, 4<->10, 7<->10.",
         "Zone pairs are symmetric (1->7 costs the same as 7->1). Zones are stored as text.",
-        "ticket_type values: monthly, weekly, one_way_peak, one_way_offpeak, one_way_senior_disabled, "
-        "day_pass_weekday, day_pass_weekend, onboard_one_way_peak, onboard_one_way_offpeak.",
-        "No ten-trip or round-trip prices (those tickets were discontinued in January 2026).",
+        "ticket_type values: monthly, weekly, one_way_peak, one_way_offpeak, one_way_senior_disabled; "
+        "post_2026 only: day_pass_weekday, day_pass_weekend, onboard_one_way_peak, onboard_one_way_offpeak; "
+        "pre_2026 only: ten_trip_peak, ten_trip_offpeak, ten_trip_senior_disabled.",
+        "Within New York City (zones 1/3 to zone 1) pre_2026 one-way prices are CityTicket fares.",
+        "To price ticket_sales: zones join as CAST(origin_station_zone AS VARCHAR) = origin_zone; map "
+        "sold_as/fare_type to ticket_type: monthly->monthly, weekly->weekly, one_way+peak->one_way_peak, "
+        "one_way+off_peak->one_way_offpeak, one_way+half->one_way_senior_disabled, ten_trip+peak->"
+        "ten_trip_peak, ten_trip+off_peak->ten_trip_offpeak, ten_trip+half->ten_trip_senior_disabled. "
+        "No chart lists round-trip or day-pass-by-fare_type prices directly; state any assumption.",
+    ],
+    "ticket_spend_est": [
+        "ESTIMATED spending per day, ticket kind and zone pair: LIRR ticket_sales priced with lirr_fares "
+        "(built offline by data/build_db.py). Use it for 'what riders pay/spend' questions.",
+        "est_spend_usd = units_priced x price_usd, at the fares in force that day (fare_period: pre_2026 "
+        "before 2026-01-04, post_2026 from then). NULL when no price matches; always report the share of "
+        "tickets priced, e.g. sum(tickets) FILTER (WHERE price_usd IS NOT NULL) / sum(tickets).",
+        "Rules: ten_trip units_priced = tickets / 10 (the data counts rides) at the ten-trip price; "
+        "round trips are priced as one one-way fare per counted leg; day passes use the weekday or "
+        "weekend price; family and intermediate fares and zone pairs missing from the 2023 chart are unpriced.",
+        "Feb-Sep spending: 2025 about 94% of tickets priced, 2026 about 97%. Not actual MTA revenue "
+        "(no discounts, refunds or unused tickets).",
     ],
     "sources": [
         "Where each table came from (data.ny.gov dataset id and URL) and when it was downloaded. Use for citations.",

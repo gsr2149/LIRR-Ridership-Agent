@@ -15,7 +15,7 @@ MAX_ROWS = 200
 TIMEOUT_SECONDS = 30
 
 KNOWN_TABLES = ["ticket_sales", "daily_ridership", "monthly_ridership",
-                "stop_occupancy", "lirr_fares", "sources"]
+                "stop_occupancy", "lirr_fares", "sources", "ticket_spend_est"]
 
 # Anything that could change data, touch files or the network is refused.
 # (The connection is read-only too; this gives the model a clear error.)

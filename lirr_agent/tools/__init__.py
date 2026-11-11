@@ -61,9 +61,10 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "lookup_fare",
         "description": (
-            "Look up LIRR fares effective January 4, 2026 between two places. Each place can be "
-            "a fare zone (1, 3, 4, 7, 9, 10, 12, 14) or a station name such as 'Hicksville'. "
-            "Only 2026 prices exist; there are no pre-2026 prices."
+            "Look up LIRR fares between two places, BEFORE (effective 2023-08-20) and AFTER "
+            "(effective 2026-01-04) the January 2026 fare change, with the percent change per "
+            "ticket type. Each place can be a fare zone (1, 3, 4, 7, 9, 10, 12, 14) or a station "
+            "name such as 'Hicksville'. Ten-trip prices exist only before 2026; Day Pass prices only after."
         ),
         "input_schema": {
             "type": "object",
