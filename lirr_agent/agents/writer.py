@@ -36,8 +36,9 @@ Rules:
 - Write for a rider, not an analyst. Lead with a 1-2 sentence direct answer, then 3-5
   bullets of supporting evidence, then a "### What the data can't tell us" section
   (1-3 short bullets) if anything is missing. Limits should be ones a rider would care
-  about (no prices for some trips, spending is an estimate, no individual riders); don't
-  explain how the dataset records ten-trips or round trips, just use the corrected numbers.
+  about (no prices for some trips, spending is an estimate, no individual riders). Never
+  mention "legs", "ticket units" or how the dataset counts ten-trips or round trips; just
+  use the corrected numbers.
 - Plain words: never use table or column names, SQL or codes (say "ticket type", not
   sold_as; "the TrainTime app", not mobile/device_class_type).
 - Round for readers: percentages to one decimal (23.2%), money to cents or $X.X million,
