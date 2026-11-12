@@ -1,57 +1,100 @@
 # LIRR Fare Desk: what the January 2026 fare change did to riders
 
-**Live:** https://lirr-agent-343981342907.us-east1.run.app · **Path:** Deep Research · **Team:** hgn2108, gsr2149
+**Try it:** https://lirr-agent-343981342907.us-east1.run.app · **Path:** Deep Research · **Team:** hgn2108, gsr2149
 
-On January 4, 2026 the Long Island Rail Road raised fares, retired the ten-trip ticket, replaced
-round trips with a Day Pass and made buying onboard more expensive. This agent answers one question
-people actually have about that change:
+On January 4, 2026 the Long Island Rail Road raised its fares. The headline number was "up to
+about 4.5%", and that's exactly what you pay if you buy a monthly ticket. But the same day the LIRR
+also retired the ten-trip ticket and replaced round trips with a Day Pass, so for many riders the
+real change looks nothing like 4.5%:
 
-> **How did the January 2026 LIRR fare and ticketing changes change what riders buy and what they pay?**
+| On a typical trip into Manhattan (e.g. Ronkonkoma ⇄ Penn Station) | Cheapest way to ride, per month |
+|---|---|
+| Daily commuter, rush hour | **+4.4%** (monthly ticket either way) |
+| Rides in 1–2 days a week, rush hour | **−5.5%**: the new Day Pass beats two one-ways |
+| Rides 1–2 days a week, off-peak | **+23.3%**: the ten-trip's off-peak discount is gone |
 
-Ask it in plain English. A **Lead** agent plans the research, two to four **Researchers** query
-17 million rows of MTA ticket sales, ridership and train-crowding data in parallel, and a **Writer**
-reports. Every number in the answer is cited to the SQL query it came from, and code checks that the
-number actually appears in that query's rows.
+The averages hide that, and the MTA's own data doesn't show it on its own either: you have to put
+the fare charts, the ticket sales and the ridership counts side by side. **LIRR Fare Desk** does
+that for you, in two ways:
+
+1. **"What should I buy now?"** Enter your two stations, how many days a week you ride, and
+   whether it's rush hour or off-peak. You instantly get the cheapest ticket now, what the same habit
+   cost before January 4, and a grid showing who on your line pays more and who pays less. No AI is
+   involved: it's straight from the fare charts.
+2. **"What actually happened?"** Ask any question in plain English, such as "what did riders buy
+   instead of ten-trips?", "did people switch to the app?", "did trains get emptier?" or "how much
+   more are riders spending?". A small team of AI agents researches it in the MTA's own open data
+   and writes a short answer. Every number links to the exact query behind it, and code checks each
+   number before you see it.
 
 ## Who it's for
 
-- **LIRR riders** working out what to buy now that the ten-trip is gone, and what their trip costs now.
-- **Transit advocates and reporters** checking the MTA's claims against the MTA's own open data.
-- **Students of transit policy** curious how one fare change ripples through a commuter railroad.
+- **Riders** who used to buy ten-trips, or who commute a few days a week, and want to know what to
+  buy now and whether they're paying more.
+- **Transit advocates and reporters** who want to test the "about 4.5%" headline against the MTA's
+  own data, and see which riders absorbed more of the change.
+- **Anyone curious** how one fare decision ripples through a railroad that carries about 230,000
+  riders a day.
 
-## What it does that a chatbot can't
+## What it found
 
-| | |
-|---|---|
-| **Uses data the model doesn't have** | 2025–2026 ticket sales and ridership, the January 2026 fare chart, and a reconstruction of the fares in force before it. Asked the same questions with no tools, the same model refuses or gets the price wrong (see the sample queries below). |
-| **Shows the research live** | The page streams the Lead's plan, each Researcher's SQL and findings, the Lead's gap review and the Writer's checks as they happen (`POST /chat/stream`). |
-| **Checks its own numbers** | Code, not the model, checks that every `[q_…]` citation is a query that ran, and that every number next to it appears in that query's rows (or is a simple difference, ratio, percent change or share of them). If one doesn't, the Writer has to fix it, and anything still unmatched is flagged under the answer. |
-| **Before and after prices** | The MTA only publishes the current fare chart. We rebuilt the August 2023 – January 2026 fares from the MTA's adopted 2023 fare table, so the agent can compute real price changes for 84% of 2025 tickets. |
-| **Spending estimates with stated coverage** | An offline build step prices every one of 89 million ticket sales (`ticket_spend_est`), so "what do riders pay" questions get a consistent estimate plus the share of tickets that could be priced. |
-| **Found a quirk in the MTA data** | Every `ten_trip` count in the ticket-sales data is a multiple of 10: the dataset counts **rides**, ten per ten-trip ticket, and round trips mostly per leg. The data dictionary doesn't say so. The agents are told, and the spending table divides ten-trip counts by 10. |
-| **Instant commute check** | Pick two stations to see every ticket's price before and after, with the change, retired tickets and new tickets. This comes straight from the fare charts, with no model call (`GET /api/fare`). |
-| **Says what the data can't answer** | Vague questions get a clarifying question back. Out-of-scope questions (the subway, other years, individual riders) are declined with what *can* be answered. Every answer ends with "What the data can't tell us". |
+A few results from the agent, all reproducible from the sample queries below:
+
+- **Riders didn't leave; they switched tickets.** Ridership rose 3.6% (Feb–Sep 2026 vs Feb–Sep
+  2025), while one-way tickets went from 77% to 92% of sales and the new Day Pass took about 6%.
+- **The ten-trip mattered most off-peak.** At rush hour a ten-trip cost the same per ride as a
+  one-way, so peak riders lost nothing. Off-peak it was about a 15% discount, and that's who pays more now.
+- **Riders spent an estimated 8% more on tickets** ($458M → $496M for Feb–Sep), nearly 5 points more
+  than ridership grew. That's an estimate from ticket counts × fares, and the agent says what it
+  could and couldn't price.
+- **A quirk in the MTA's data:** every ten-trip sale is recorded as 10 "tickets" (one per ride), and
+  round trips mostly per leg. The data dictionary doesn't say so; the agents know, and correct for it.
+
+## Using it
+
+- **Your trip:** type two stations (typos are fine), then tap your days per week and rush hour /
+  off-peak. Tap any cell in the "Who pays more" grid to see that rider's best ticket.
+- **Ask the research desk:** type a question or tap an example. You'll watch the research happen:
+  the Lead splits your question into angles, 2–4 Researchers query the data in parallel, the Lead
+  checks for gaps, and the Writer reports. Answers take about 15–40 seconds.
+- **Check anything:** tap a citation like `q_1a2b3c4d` to open the exact SQL and the rows it
+  returned. Badges under each answer show how many cited queries and numbers passed the code checks.
+- **Vague or off-topic questions** get a clarifying question, or an honest "this data can't answer
+  that", with tap-to-ask suggestions for what it *can* answer.
 
 ## How it works
 
 ```
-question ─► Lead.plan ── vague? ──► one clarifying question (with options)
-               │ ── out of scope? ─► what the data can and can't answer
+question ─► Lead.plan ── vague? ──► one clarifying question + suggested questions
+               │ ── out of scope? ─► why not, + questions the data can answer
                ▼
         2-4 sub-questions, each a different angle
-        (direct effect · substitution · how riders buy · ridership context · price)
-               │  run in parallel, each in a fresh context
+        (direct effect · substitution · how riders buy · ridership · price · who pays more)
+               │  run in parallel, each Researcher in a fresh context
    ┌───────────┼───────────┬───────────┐
-researcher-1 researcher-2 researcher-3 researcher-4     tools: run_sql, describe_table, lookup_fare
+researcher-1 researcher-2 researcher-3 researcher-4
+   tools: run_sql · describe_table · lookup_fare · compare_ticket_costs
    └───────────┴─────┬─────┴───────────┘
                      ▼
-              Lead.review ── gap or surprise? ──► follow-up Researchers (round cap: 2)
+              Lead.review ── gap, surprise or unfair comparison? ──► follow-up Researchers (cap: 2 rounds)
                      ▼
-                  Writer ──► answer with [q_xxxxxxxx] / [fare chart …] citations
+                  Writer ──► short answer with [q_xxxxxxxx] / [fare chart …] citations
                      ▼
-     code: verify_citations · verify_numbers (one rewrite if a number isn't in its rows)
-           · charts from the cited query results · Sources list built from the real queries
+     code: every citation is a query that ran · every number is in (or one step from) its rows,
+           otherwise the Writer rewrites once · charts from the cited rows · Sources list
 ```
+
+Three details that make the answers trustworthy rather than just fluent:
+
+- **Fresh contexts, different angles.** Each Researcher sees only its own sub-question, so one
+  Researcher's guess can't steer another. The Lead is told to cover different angles (what riders
+  bought instead, how they bought, whether ridership changed, prices) rather than one measure month by month.
+- **The Lead reviews before anyone writes.** It looks for missing "so what"s, surprises nobody
+  checked, and unfair comparisons, e.g. Sep–Dec 2025 vs Jan–Apr 2026, which mixes seasons. It sends
+  follow-up Researchers, for up to two rounds.
+- **Numbers are checked by code, not by the model.** `lirr_agent/agents/grounding.py` matches each
+  number in a cited sentence against the cited query's rows. It allows for rounding, millions and
+  simple derived values (differences, ratios, percent changes, shares). Uncited numbers are flagged too.
 
 | Deep Research requirement | Where |
 |---|---|
@@ -59,7 +102,7 @@ researcher-1 researcher-2 researcher-3 researcher-4     tools: run_sql, describe
 | Lead fans out to several Researchers in one turn, in parallel, in fresh contexts | `lead.dispatch()`: a thread pool; each Researcher sees only its sub-question |
 | Lead goes back for more when there's a gap, up to a turn cap | `lead.review()`, `MAX_RESEARCH_ROUNDS` (default 2) |
 | Vague questions get clarification | Lead `clarify` action (try "Did things change?") |
-| Output is accurately cited | `writer.check_citations`, `agents/grounding.py`; Sources are built by code from queries that ran |
+| Output is accurately cited | `writer.check_citations`, `agents/grounding.py`; the Sources list is built by code from queries that ran |
 | Sub-agent tool calls in `tool_calls` with an `agent` field | every entry is `{agent, name, args, result}`; agents are `lead`, `researcher-N`, `writer` |
 
 ### API
@@ -75,20 +118,22 @@ researcher-1 researcher-2 researcher-3 researcher-4     tools: run_sql, describe
                  "result": {"query_id": "q_1a2b3c4d", "columns": […], "rows": […]}}, …]}
 ```
 
-Besides real tool calls (`run_sql`, `describe_table`, `lookup_fare`), the trace records each agent's
-decisions: `plan`, `dispatch_researchers`, `report_finding`, `review`, `verify_citations`,
-`verify_numbers` and `chart`.
+Besides real tool calls (`run_sql`, `describe_table`, `lookup_fare`, `compare_ticket_costs`), the
+trace records each agent's decisions: `plan`, `dispatch_researchers`, `report_finding`, `review`,
+`verify_citations`, `verify_numbers` and `chart`.
 
 | Endpoint | |
 |---|---|
-| `POST /chat/stream` | Same answer, streamed as NDJSON events (`phase`, `researcher_start`, `step`), then a final `done` line with the `/chat` body |
-| `GET /api/fare?origin=…&destination=…` | Before/after fares between two stations or zones (no model call) |
+| `POST /chat/stream` | The same answer, streamed as NDJSON events (`phase`, `researcher_start`, `step`), then a final `done` line with the `/chat` body |
+| `GET /api/advise?origin=…&destination=…&days=1-5&time=peak\|offpeak` | Cheapest way to ride before vs after, every option priced, and the who-pays-more grid (no model call) |
+| `GET /api/fare?origin=…&destination=…` | Every fare between two stations or zones, before and after |
 | `GET /api/stations` | LIRR stations and their fare zones |
 | `GET /health` | Liveness |
 
 ## Data
 
-One source per team member, and then some: five public sources, plus one table we built from them.
+Five public sources (more than one per team member), plus one table we built from them. None of it is
+something a language model knows: it's 2025–2026 data, and the new fares took effect after most models' training.
 
 | Table | Source | Rows | What it adds |
 |---|---|---|---|
@@ -253,15 +298,15 @@ tools and no system prompt. The expected answers come from SQL run directly on t
 
 **Verdict:** The baseline can't answer. The agent gives the estimate, says what share of tickets it could price, and explains which way that bias runs.
 
-More to try: "Did more riders buy in the TrainTime app after the change?", "Did trains get less
-crowded after the fare increase?", "Did things change?" (to see a clarifying question) and
-"How crowded is the subway?" (to see a decline).
+More to try: "I ride from Ronkonkoma to Penn Station off-peak twice a week. What should I buy now?",
+"Which riders were hit hardest?", "Did more riders buy in the TrainTime app after the change?",
+"Did things change?" (to see a clarifying question) and "How crowded is the subway?" (to see a decline).
 
 ## Run it locally
 
 ```bash
 uv sync
-uv run pytest -q                 # 50 tests, with a fake Gemini; no API key needed
+uv run pytest -q                 # 54 tests, with a fake Gemini; no API key needed
 ```
 
 Put the database at `data/lirr.duckdb` (build it as above, or copy it from the bucket with
@@ -286,11 +331,11 @@ memory), and each Gemini request times out after 90 s with retries. Answers usua
 |---|---|
 | `app.py` | Entry point (`uvicorn app:app`) |
 | `lirr_agent/agents/` | `lead.py`, `researcher.py`, `writer.py`, `grounding.py` (number check), `charts.py`, `context.py` (shared prompt text) |
-| `lirr_agent/tools/` | `run_sql` (read-only, row cap, timeout, query ids), `describe_table`, `lookup_fare`, schema notes |
+| `lirr_agent/tools/` | `run_sql` (read-only, row cap, timeout, query ids), `describe_table`, `lookup_fare`, `advisor.py` (`compare_ticket_costs`), schema notes |
 | `lirr_agent/llm.py` | Gemini tool loop with per-agent tagging, retries and timeouts |
 | `lirr_agent/events.py`, `main.py` | Live event stream; FastAPI routes |
 | `lirr_agent/static/` | The front end (no build step) |
 | `data/` | `fetch.py`, `build_db.py`, `SCHEMA.md`, the fare CSV and the source PDFs |
-| `tests/` | Tools, agent loop, Lead/Writer behaviour, citation and number checks, charts, streaming |
+| `tests/` | Tools, ticket advisor, agent loop, Lead/Writer behaviour, citation and number checks, charts, streaming |
 
 Not affiliated with the MTA. Data © MTA, via data.ny.gov.

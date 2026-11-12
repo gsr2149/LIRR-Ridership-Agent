@@ -40,25 +40,112 @@ $("#swap").addEventListener("click", () => {
   if ($("#from").value && $("#to").value) $("#commute-form").requestSubmit();
 });
 
+const trip = { days: 3, time: "peak", fare: null };
+
 $("#commute-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const from = $("#from").value.trim(), to = $("#to").value.trim();
+  trip.from = $("#from").value.trim();
+  trip.to = $("#to").value.trim();
   const out = $("#commute-result");
   out.innerHTML = `<p class="small">Looking up both fare charts…</p>`;
   try {
-    const r = await fetch(`/api/fare?origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}`);
+    const r = await fetch(`/api/fare?origin=${encodeURIComponent(trip.from)}&destination=${encodeURIComponent(trip.to)}`);
     const data = await r.json();
-    if (data.error) { out.innerHTML = `<p class="error-box">${esc(data.error)}</p>`; return; }
-    out.innerHTML = renderFares(data, data.origin_name || from, data.destination_name || to);
-    $(".fare-ask button", out)?.addEventListener("click", (ev) => {
-      $("#q").value = ev.currentTarget.dataset.q;
-      $("#ask-form").requestSubmit();
-      $("#ask-title").scrollIntoView({ behavior: "smooth" });
-    });
+    if (data.error) { $("#pattern").hidden = true; out.innerHTML = `<p class="error-box">${esc(data.error)}</p>`; return; }
+    trip.fare = data;
+    $("#pattern").hidden = false;
+    await showAdvice();
   } catch {
     out.innerHTML = `<p class="error-box">Couldn't reach the fare lookup. Try again in a moment.</p>`;
   }
 });
+
+$("#pattern").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || !trip.fare) return;
+  if (b.dataset.days) trip.days = +b.dataset.days;
+  if (b.dataset.time) trip.time = b.dataset.time;
+  showAdvice();
+});
+
+function syncPattern() {
+  $("#pattern").querySelectorAll("button").forEach((b) => {
+    const on = b.dataset.days ? +b.dataset.days === trip.days : b.dataset.time === trip.time;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+async function showAdvice() {
+  syncPattern();
+  const out = $("#commute-result");
+  const q = new URLSearchParams({ origin: trip.from, destination: trip.to, days: trip.days, time: trip.time });
+  const adv = await fetch(`/api/advise?${q}`).then((r) => r.json());
+  const d = trip.fare;
+  const from = d.origin_name || trip.from, to = d.destination_name || trip.to;
+  out.innerHTML = `<div class="fare-head"><b>${esc(from)} ⇄ ${esc(to)}</b>
+      <span class="zone-tag">ZONE ${esc(d.origin_zone)} → ${esc(d.destination_zone)}</span></div>
+    ${adv.error ? `<p class="error-box">${esc(adv.error)}</p>` : renderAdvice(adv)}
+    <details class="allfares"><summary>Every fare for this trip, before and after</summary>${renderFares(d, from, to)}</details>`;
+  out.querySelector(".grid")?.addEventListener("click", (e) => {
+    const c = e.target.closest("button[data-days]");
+    if (!c) return;
+    trip.days = +c.dataset.days; trip.time = c.dataset.time;
+    showAdvice();
+  });
+  out.querySelectorAll(".fare-ask button").forEach((btn) => btn.addEventListener("click", (ev) => {
+    $("#q").value = ev.currentTarget.dataset.q;
+    $("#ask-form").requestSubmit();
+    $("#ask-title").scrollIntoView({ behavior: "smooth" });
+  }));
+}
+
+const usd = (v) => "$" + Math.round(v).toLocaleString("en-US");
+const TIME_LABEL = { peak: "rush hour", offpeak: "off-peak" };
+
+function renderAdvice(a) {
+  const p = a.pattern, now = p.best_after, was = p.best_before;
+  const habit = `${p.days_per_week} day${p.days_per_week === 1 ? "" : "s"} a week, ${TIME_LABEL[p.time]}`;
+  let change = `<p>The 2023 fare table has no prices for this trip, so there's no before-and-after.</p>`;
+  if (was && p.change_pct != null) {
+    const up = p.change_usd > 0;
+    change = `<p>Before January 4, your cheapest option was <b>${esc(was.option.toLowerCase())}</b> at
+      ${usd(was.monthly_cost_usd)} a month. For the same riding you now pay
+      <b class="${up ? "up" : "down"}">${usd(Math.abs(p.change_usd))} ${up ? "more" : "less"} a month
+      (${up ? "+" : "−"}${Math.abs(p.change_pct)}%)</b>.</p>`;
+  }
+  const list = (opts, best) => opts.map((o) => `<li class="${o.option === best ? "best" : ""}"><span>${esc(o.option)}<small>${esc(o.how)}</small></span><b>${usd(o.monthly_cost_usd)}</b></li>`).join("");
+  const grid = renderGrid(a.grid, p);
+  const q = `What did riders between ${a.origin_name} and ${a.destination_name} who ride about ${habit} buy after the ten-trip ended, and how much more or less do they pay?`;
+  return `<div class="verdict">
+      <p class="kicker">Best way to ride now · ${esc(habit)}</p>
+      <p class="big">${esc(now.option)} <span>${usd(now.monthly_cost_usd)}<small> / month</small></span></p>
+      ${change}
+    </div>
+    <div class="opts">
+      <div><h4>Now</h4><ol>${list(a.options_after, now.option)}</ol></div>
+      <div><h4>Before Jan 4, 2026</h4>${a.options_before.length ? `<ol>${list(a.options_before, was?.option)}</ol>` : `<p class="small">No 2023 prices for this trip.</p>`}</div>
+    </div>
+    ${grid}
+    <details class="assume"><summary>How this is worked out</summary><ul class="small">${a.assumptions.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>
+    <div class="fare-ask"><button type="button" class="btn ghost" data-q="${esc(q)}">Ask the researchers what riders like you did →</button></div>`;
+}
+
+function renderGrid(grid, p) {
+  if (!grid.some((g) => g.change_pct != null)) return "";
+  const cell = (g) => {
+    if (g.change_pct == null) return `<td>—</td>`;
+    const k = Math.min(Math.abs(g.change_pct) / 25, 1).toFixed(2);
+    const cls = g.change_pct > 0.05 ? "up" : g.change_pct < -0.05 ? "down" : "flat";
+    const sel = g.days_per_week === p.days_per_week && g.time === p.time ? " sel" : "";
+    const tip = `${g.best_before.option} ${usd(g.best_before.monthly_cost_usd)} → ${g.best_after.option} ${usd(g.best_after.monthly_cost_usd)}`;
+    return `<td><button type="button" class="${cls}${sel}" style="--k:${k}" data-days="${g.days_per_week}" data-time="${g.time}" title="${esc(tip)}">${g.change_pct > 0 ? "+" : ""}${g.change_pct}%</button></td>`;
+  };
+  const row = (t) => `<tr><th>${t === "peak" ? "Rush hour" : "Off-peak"}</th>${grid.filter((g) => g.time === t).map(cell).join("")}</tr>`;
+  return `<div class="grid-wrap"><h4>Who pays more on this trip?</h4>
+    <p class="small">Change in the cheapest monthly cost, by how often and when you ride. Tap a cell.</p>
+    <div class="rows-wrap"><table class="grid"><thead><tr><th></th>${[1, 2, 3, 4, 5].map((d) => `<th>${d} day${d === 1 ? "" : "s"}</th>`).join("")}</tr></thead>
+    <tbody>${row("peak")}${row("offpeak")}</tbody></table></div></div>`;
+}
 
 function renderFares(d, from, to) {
   const rows = d.fares.map((f) => {
@@ -72,14 +159,10 @@ function renderFares(d, from, to) {
       <td class="num">${change}</td></tr>`;
   }).join("");
   const notes = (d.notes || []).slice(1).map((n) => `<li>${esc(n)}</li>`).join("");
-  const q = `How did ticket buying change for trips between ${from} and ${to} (zone ${d.origin_zone} and zone ${d.destination_zone}) after January 2026, and what do riders on that trip pay now?`;
-  return `<div class="fare-head"><b>${esc(from)} ⇄ ${esc(to)}</b>
-      <span class="zone-tag">ZONE ${esc(d.origin_zone)} → ${esc(d.destination_zone)}</span>
-      <span class="small">Before = fares from Aug 20 2023 · Now = fares from Jan 4 2026</span></div>
+  return `<p class="small">Before = fares from Aug 20, 2023 · Now = fares from Jan 4, 2026</p>
     <div class="rows-wrap"><table class="fares"><thead><tr><th>Ticket</th><th class="num">Before</th><th class="num">Now</th><th class="num">Change</th></tr></thead>
     <tbody>${rows}</tbody></table></div>
-    ${notes ? `<ul class="fare-notes small">${notes}</ul>` : ""}
-    <div class="fare-ask"><button type="button" class="btn ghost" data-q="${esc(q)}">Ask the researchers what changed for riders on this trip →</button></div>`;
+    ${notes ? `<ul class="fare-notes small">${notes}</ul>` : ""}`;
 }
 
 /* ---------------- asking ---------------- */

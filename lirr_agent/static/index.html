@@ -47,7 +47,7 @@
       <article class="stub">
         <h2>How to use it</h2>
         <ol>
-          <li>Ask in plain English, or tap an example.</li>
+          <li>Enter your trip below to see what to buy now, or ask the research desk a question.</li>
           <li>Watch the <b>Lead</b> plan, 2–4 <b>Researchers</b> query the data in parallel, and the <b>Writer</b> report.</li>
           <li>Tap any citation like <span class="cite-demo">q_1a2b3c4d</span> to see the exact SQL and rows behind a number.</li>
         </ol>
@@ -66,16 +66,28 @@
 
     <section class="card commute" aria-labelledby="commute-title">
       <div class="card-head">
-        <h2 id="commute-title">Check your commute</h2>
-        <p class="small">Instant, straight from the two fare charts (no AI involved).</p>
+        <h2 id="commute-title">Your trip: what to buy now</h2>
+        <p class="small">Instant, straight from the MTA fare charts (no AI involved).</p>
       </div>
+      <p class="lead-in">The ten-trip is gone, so the cheapest ticket depends on how often you ride. Enter your trip
+        to see what to buy now, what the same habit cost before January 4, and who on your line pays more.</p>
       <form id="commute-form" class="commute-form" autocomplete="off">
         <label>From <input id="from" list="stations" placeholder="Penn Station" required></label>
         <button type="button" class="swap" id="swap" aria-label="Swap stations" title="Swap">⇄</button>
         <label>To <input id="to" list="stations" placeholder="Hicksville" required></label>
-        <button type="submit" class="btn">Compare fares</button>
+        <button type="submit" class="btn">Show my options</button>
         <datalist id="stations"></datalist>
       </form>
+      <div class="pattern" id="pattern" hidden>
+        <div class="seg" role="group" aria-label="Days a week">
+          <span class="seg-label">Days a week</span>
+          <button type="button" data-days="1">1</button><button type="button" data-days="2">2</button><button type="button" data-days="3" aria-pressed="true">3</button><button type="button" data-days="4">4</button><button type="button" data-days="5">5</button>
+        </div>
+        <div class="seg" role="group" aria-label="When you ride">
+          <span class="seg-label">When</span>
+          <button type="button" data-time="peak" aria-pressed="true">Rush hour</button><button type="button" data-time="offpeak">Off-peak</button>
+        </div>
+      </div>
       <div id="commute-result" aria-live="polite"></div>
     </section>
 
@@ -87,6 +99,8 @@
       <div class="examples" id="examples" aria-label="Example questions">
         <button type="button" data-q="What did riders buy instead of ten-trip and round-trip tickets?">What replaced the ten-trip?</button>
         <button type="button" data-q="How much more does a Hicksville commuter pay now than before January 2026?">Hicksville commuter, before vs after</button>
+        <button type="button" data-q="I ride from Ronkonkoma to Penn Station off-peak twice a week. What should I buy now, and am I paying more than before?">Twice a week off-peak: what do I buy?</button>
+        <button type="button" data-q="Which LIRR riders were hit hardest by the January 2026 fare change: daily commuters, part-time commuters or occasional off-peak riders?">Who was hit hardest?</button>
         <button type="button" data-q="Roughly how much more did LIRR riders spend on tickets in Feb-Sep 2026 than in Feb-Sep 2025?">Did riders spend more overall?</button>
         <button type="button" data-q="Did more riders buy in the TrainTime app instead of ticket machines after the change?">App vs ticket machines</button>
         <button type="button" data-q="Did trains get less crowded after the fare increase?">Did trains get emptier?</button>

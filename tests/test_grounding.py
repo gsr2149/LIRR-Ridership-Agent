@@ -44,8 +44,9 @@ def test_fare_citations_check_against_fare_lookups():
     assert [u["number"] for u in r["unsupported"]] == ["$310"]
 
 
-def test_uncited_sentences_are_not_checked():
-    assert check_numbers("Fares rose about 8% [MTA announcement]. Riders: 99.", [_finding(ROWS)])["checked"] == 0
+def test_uncited_numbers_are_flagged_and_background_is_not_checked():
+    r = check_numbers("Fares rose about 8% [MTA announcement]. Riders now pay $277.33 a month.", [_finding(ROWS)])
+    assert [(u["number"], u["cited"]) for u in r["unsupported"]] == [("$277.33", [])]
 
 
 def test_numbers_belong_to_the_citation_that_follows_them():

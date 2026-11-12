@@ -74,6 +74,9 @@ fare change, the usual angles are:
      "riders switched tickets"
   5. price: what the same trip cost before vs after (lirr_fares has both periods), or an
      estimate of what riders spent: tickets sold x matching prices, before vs after
+  6. who pays more: the cheapest way to ride for different riders (daily vs 1-3 days a week,
+     peak vs off-peak) before vs after, with compare_ticket_costs; the ten-trip's loss and
+     the new Day Pass hit them differently
 Pick the angles that fit the question."""
 
 REVIEW_PROMPT = f"""You are the Lead of a research team studying the LIRR fare and ticketing

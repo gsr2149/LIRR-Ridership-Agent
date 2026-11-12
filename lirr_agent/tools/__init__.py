@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 from typing import Any, Callable
 
+from .advisor import compare_ticket_costs
 from .fares import TICKET_TYPES, lookup_fare
 from .schema import describe_table, list_tables
 from .sql import MAX_ROWS, run_sql
@@ -80,6 +81,28 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["origin", "destination"],
         },
         "fn": lambda origin, destination, ticket_type=None, **_: lookup_fare(origin, destination, ticket_type),
+    },
+    {
+        "name": "compare_ticket_costs",
+        "description": (
+            "For one trip and a riding pattern, the cheapest way to ride for a month BEFORE and AFTER "
+            "the January 2026 change, every option priced (one-ways, ten-trip, app one-ways with the "
+            "11th free, Day Pass, weekly, monthly), and a grid of how the change hit each pattern "
+            "(1-5 days a week x peak/off-peak) on that trip. Use it for 'what should I buy', 'who pays "
+            "more' and hybrid/part-time commuter questions. Numbers come from the two fare charts."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "origin": {"type": "string", "description": "Zone number or LIRR station name."},
+                "destination": {"type": "string", "description": "Zone number or LIRR station name."},
+                "days_per_week": {"type": "integer", "description": "Weekdays ridden, 1-5 (one round trip each)."},
+                "time": {"type": "string", "enum": ["peak", "offpeak"]},
+            },
+            "required": ["origin", "destination"],
+        },
+        "fn": lambda origin, destination, days_per_week=5, time="peak", **_:
+            compare_ticket_costs(origin, destination, days_per_week, time),
     },
 ]
 

@@ -16,7 +16,9 @@ from .context import BACKGROUND, DATA_RULES, schema_brief, station_zone_brief
 
 RESEARCHER_MODEL = os.environ.get("RESEARCHER_MODEL") or None  # None = same as GEMINI_MODEL
 MAX_TOOL_ROUNDS = 8
-TOOL_NAMES = ["describe_table", "run_sql", "lookup_fare"]
+TOOL_NAMES = ["describe_table", "run_sql", "lookup_fare", "compare_ticket_costs"]
+FARE_TOOLS = {"lookup_fare", "compare_ticket_costs"}  # tools whose numbers come from the fare charts
+
 
 SYSTEM_PROMPT = f"""You are a Researcher on a team studying the Long Island Rail Road (LIRR).
 You get ONE sub-question. Answer it with evidence from your tools only, then stop.
@@ -52,7 +54,7 @@ class Finding:
 
     @property
     def used_fares(self) -> bool:
-        return any(c["name"] == "lookup_fare" and "error" not in c["result"] for c in self.tool_calls)
+        return any(c["name"] in FARE_TOOLS and "error" not in c["result"] for c in self.tool_calls)
 
 
 def research(finding_id: str, agent: str, sub_question: str, user_question: str) -> Finding:

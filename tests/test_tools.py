@@ -52,7 +52,7 @@ def fake_db(tmp_path, monkeypatch):
 
 def test_every_tool_has_a_spec():
     names = {t["name"] for t in tool_specs()}
-    assert names == {"list_tables", "describe_table", "run_sql", "lookup_fare"}
+    assert names == {"list_tables", "describe_table", "run_sql", "lookup_fare", "compare_ticket_costs"}
     for spec in tool_specs():
         assert spec["description"] and spec["input_schema"]["type"] == "object"
         assert "fn" not in spec

@@ -20,7 +20,7 @@ from ..tools.db import connection
 from .context import BACKGROUND, BACKGROUND_CITATION, FARE_CITATION, FARE_CITATION_BEFORE, FARE_CITATIONS
 from .charts import charts_for_answer
 from .grounding import check_numbers
-from .researcher import Finding
+from .researcher import FARE_TOOLS, Finding
 
 AGENT_NAME = "writer"
 MAX_ROWS_SHOWN = 40  # rows per query passed to the Writer
@@ -66,7 +66,7 @@ def _material(question: str, findings: list[Finding]) -> str:
                 "columns": q["columns"], "rows": q["rows"][:MAX_ROWS_SHOWN],
                 "truncated": q.get("truncated") or len(q["rows"]) > MAX_ROWS_SHOWN,
             })
-        fares = [c["result"] for c in f.tool_calls if c["name"] == "lookup_fare" and "error" not in c["result"]]
+        fares = [c["result"] for c in f.tool_calls if c["name"] in FARE_TOOLS and "error" not in c["result"]]
         blocks.append(
             f"## Finding {f.id} ({f.agent})\nSub-question: {f.question}\n{f.summary}\n"
             f"Query results:\n{json.dumps(queries, default=str)}"
@@ -76,7 +76,7 @@ def _material(question: str, findings: list[Finding]) -> str:
     return "\n\n".join(blocks)
 
 
-FARE_ALIAS_RE = re.compile(r"^(lookup_fare|fare lookups?|fare chart|fare table|lirr fares?)$", re.I)
+FARE_ALIAS_RE = re.compile(r"^(lookup_fare|compare_ticket_costs|fare lookups?|fare chart|fare charts|fare table|lirr fares?)$", re.I)
 
 
 FINDING_REF_RE = re.compile(r"^(finding\s+)?R\d+$", re.I)
@@ -187,11 +187,12 @@ def write(question: str, findings: list[Finding]) -> tuple[str, list[dict]]:
     numbers = check_numbers(draft, findings)
     number_retry = False
     if numbers["unsupported"]:
-        listing = "\n".join(f"- {u['number']} (cited {', '.join(u['cited'])}): \"{u['sentence']}\""
-                            for u in numbers["unsupported"][:10])
+        listing = "\n".join(f"- {u['number']} ({'cited ' + ', '.join(u['cited']) if u['cited'] else 'NO citation'}): "
+                            f"\"{u['sentence']}\"" for u in numbers["unsupported"][:10])
         retry = contents + [
             model_content(draft),
-            user_content("A code check could not find these numbers in the query results they cite:\n"
+            user_content("A code check could not verify these numbers: either the query results they cite "
+                         "don't contain them, or they have no citation:\n"
                          f"{listing}\nRewrite the whole answer. For each one: cite the query whose rows "
                          "contain it, correct it to the value in the rows, or remove the claim. "
                          "Keep everything else, including the citations that are already right."),

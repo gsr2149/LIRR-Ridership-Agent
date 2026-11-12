@@ -107,6 +107,40 @@ main > *, .thread > *, .turn, .answer, .lanes > * { min-width: 0; }
   width: 2.6em; height: 2.6em; cursor: pointer; font-size: 1rem; }
 .swap:hover { border-color: var(--accent); color: var(--accent); }
 #commute-result { margin-top: 14px; }
+.lead-in { margin: -4px 0 12px; max-width: 720px; }
+.pattern { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 12px; }
+.seg { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+.seg-label { font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 8px; }
+.seg button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: .4em .85em; cursor: pointer; margin-left: -1px; }
+.seg button:first-of-type { border-radius: 8px 0 0 8px; }
+.seg button:last-of-type { border-radius: 0 8px 8px 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; position: relative; }
+.verdict { background: var(--bg); border: 1px solid var(--line); border-left: 5px solid var(--amber); border-radius: 10px; padding: 12px 16px; margin: 10px 0 14px; }
+.verdict .kicker { margin: 0; font: 600 .74rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.verdict .big { margin: 2px 0 6px; font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+.verdict .big span { white-space: nowrap; color: var(--accent); }
+.verdict .big small { font-size: .9rem; color: var(--muted); font-weight: 600; }
+.verdict p:last-child { margin-bottom: 0; }
+b.up { color: var(--warn); } b.down { color: var(--ok); }
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.opts h4, .grid-wrap h4 { margin: 0 0 6px; font: 600 .78rem "Overpass Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.opts ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.opts li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 6px 8px; border-radius: 6px; border: 1px solid transparent; }
+.opts li small { display: block; color: var(--muted); font-size: .76rem; }
+.opts li b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.opts li.best { border-color: var(--accent); background: var(--accent-soft); }
+.grid-wrap { margin-top: 16px; }
+.grid-wrap p { margin: 0 0 6px; }
+table.grid { border-collapse: separate; border-spacing: 4px; }
+table.grid th { font: 600 .72rem "Overpass Mono", monospace; color: var(--muted); text-align: left; padding: 0 4px; white-space: nowrap; }
+table.grid td button { width: 4.6em; padding: .5em 0; border-radius: 6px; border: 2px solid transparent; cursor: pointer;
+  font: 600 .82rem "Overpass Mono", monospace; color: var(--ink); background: var(--code); }
+table.grid td button.up { background: color-mix(in srgb, var(--warn) calc(var(--k) * 70%), var(--card)); }
+table.grid td button.down { background: color-mix(in srgb, var(--ok) calc(var(--k) * 70% + 15%), var(--card)); }
+table.grid td button.sel { border-color: var(--ink); }
+details.assume, details.allfares { margin-top: 12px; }
+details.assume summary, details.allfares summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+details.allfares[open] summary { margin-bottom: 8px; }
 .fare-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin-bottom: 8px; }
 .fare-head b { font-size: 1.05rem; }
 .zone-tag { font: 600 .74rem "Overpass Mono", monospace; background: var(--board); color: var(--amber);
@@ -232,6 +266,8 @@ table.rows th { background: var(--code); }
 .foot ul { margin: 0; padding-left: 1.1em; }
 
 @media (max-width: 760px) {
+  .opts { grid-template-columns: minmax(0, 1fr); }
+  .verdict .big { font-size: 1.3rem; }
   .stubs, .foot { grid-template-columns: minmax(0, 1fr); }
   .ask-form { flex-direction: column; }
   .swap { align-self: center; }

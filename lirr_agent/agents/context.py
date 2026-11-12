@@ -31,7 +31,9 @@ DATA_RULES = f"""Data rules:
 - Ticket sales and occupancy cover 2025-01-01 to 2026-09-30 in this database.
 - Never assume which zone a station is in: use the station zone list below, or
   lookup_fare (it resolves station names). Huntington, for example, is zone 9, not 7.
-- Prices from lookup_fare are cited by the chart they come from: [{FARE_CITATION}] for
+- For "what should I buy", "who pays more" or part-time/hybrid riders, use compare_ticket_costs:
+  it prices every option for a riding pattern before and after.
+- Prices from lookup_fare and compare_ticket_costs are cited by the chart they come from: [{FARE_CITATION}] for
   2026 prices, [{FARE_CITATION_BEFORE}] for pre-2026 prices (cite both for a change)."""
 
 

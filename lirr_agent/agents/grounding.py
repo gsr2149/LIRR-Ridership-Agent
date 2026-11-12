@@ -15,7 +15,7 @@ import itertools
 import re
 
 from .context import FARE_CITATIONS
-from .researcher import Finding
+from .researcher import FARE_TOOLS, Finding
 
 # A number as written: $1,234.56 / 12.5% / 3.8 million / 640K
 NUM_RE = re.compile(
@@ -86,6 +86,19 @@ def _values(rows: list) -> list[float]:
     return out
 
 
+def _numbers_in(obj) -> list[float]:
+    """Every number anywhere in a nested tool result."""
+    if isinstance(obj, bool):
+        return []
+    if isinstance(obj, (int, float)):
+        return [float(obj)]
+    if isinstance(obj, dict):
+        return [v for x in obj.values() for v in _numbers_in(x)]
+    if isinstance(obj, (list, tuple)):
+        return [v for x in obj for v in _numbers_in(x)]
+    return []
+
+
 def _derived(values: list[float]) -> list[float]:
     """Numbers one step from the data: differences, ratios, percent changes and shares."""
     vals = sorted(set(values), key=abs, reverse=True)[:MAX_VALUES_FOR_PAIRS]
@@ -105,10 +118,8 @@ def _evidence(findings: list[Finding]) -> tuple[dict[str, list[float]], list[flo
     fare_values = []
     for f in findings:
         for c in f.tool_calls:
-            if c["name"] == "lookup_fare" and "error" not in c["result"]:
-                for row in c["result"].get("fares", []):
-                    fare_values += [float(v) for k, v in row.items()
-                                    if isinstance(v, (int, float)) and not isinstance(v, bool)]
+            if c["name"] in FARE_TOOLS and "error" not in c["result"]:
+                fare_values += _numbers_in(c["result"])
     return by_qid, fare_values
 
 
@@ -124,6 +135,15 @@ def check_numbers(text: str, findings: list[Finding]) -> dict:
         # Each number belongs to the citation that follows it (or the last one in the sentence).
         cites = list(CITE_RE.finditer(sentence))
         if not cites:
+            # A number with no citation at all can't be checked: report it so the Writer cites it.
+            if not re.match(r"\s*(#|\*\*Sources)", sentence):
+                for m in NUM_RE.finditer(sentence):
+                    value, decimals, unit = _parse(m)
+                    if _is_label(sentence, m, value, unit):
+                        continue
+                    checked += 1
+                    unsupported.append({"number": m.group(0).strip(), "cited": [],
+                                        "sentence": sentence.strip()[:200]})
             continue
         start = 0
         for i, cite in enumerate(cites):

@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from . import agents, events  # noqa: E402
+from .tools.advisor import compare_ticket_costs  # noqa: E402
 from .tools.fares import lookup_fare, station_list  # noqa: E402
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -121,6 +122,12 @@ def stations():
 def fare(origin: str, destination: str):
     """Before/after fares for one trip, straight from the fare charts (no model call)."""
     return lookup_fare(origin, destination)
+
+
+@app.get("/api/advise")
+def advise(origin: str, destination: str, days: int = 5, time: str = "peak"):
+    """Cheapest way to ride a trip for a riding pattern, before vs after (no model call)."""
+    return compare_ticket_costs(origin, destination, days, time)
 
 
 @app.post("/chat")
