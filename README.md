@@ -19,11 +19,11 @@ that for you, in two ways:
 
 1. **"What should I buy now?"** Enter your two stations, how many days a week you ride, and
    whether it's rush hour or off-peak. You instantly get the cheapest ticket now, what the same habit
-   cost before January 4, and a grid showing who on your line pays more and who pays less. No AI is
-   involved: it's straight from the fare charts.
+   cost before January 4, and a grid showing who on your line pays more and who pays less, priced
+   from the official fare charts. The research agents use the same calculation as a tool.
 2. **"What actually happened?"** Ask any question in plain English, such as "what did riders buy
    instead of ten-trips?", "did people switch to the app?", "did trains get emptier?" or "how much
-   more are riders spending?". A small team of AI agents researches it in the MTA's own open data
+   more are riders spending?". A small team of research agents works through the MTA's open data
    and writes a short answer. Every number links to the exact query behind it, and code checks each
    number before you see it.
 
@@ -45,10 +45,7 @@ A few results from the agent, all reproducible from the sample queries below:
 - **The ten-trip mattered most off-peak.** At rush hour a ten-trip cost the same per ride as a
   one-way, so peak riders lost nothing. Off-peak it was about a 15% discount, and that's who pays more now.
 - **Riders spent an estimated 8% more on tickets** ($458M → $496M for Feb–Sep), nearly 5 points more
-  than ridership grew. That's an estimate from ticket counts × fares, and the agent says what it
-  could and couldn't price.
-- **A quirk in the MTA's data:** every ten-trip sale is recorded as 10 "tickets" (one per ride), and
-  round trips mostly per leg. The data dictionary doesn't say so; the agents know, and correct for it.
+  than ridership grew.
 
 ## Using it
 
@@ -59,8 +56,8 @@ A few results from the agent, all reproducible from the sample queries below:
   checks for gaps, and the Writer reports. Answers take about 15–40 seconds.
 - **Check anything:** tap a citation like `q_1a2b3c4d` to open the exact SQL and the rows it
   returned. Badges under each answer show how many cited queries and numbers passed the code checks.
-- **Vague or off-topic questions** get a clarifying question, or an honest "this data can't answer
-  that", with tap-to-ask suggestions for what it *can* answer.
+- **Vague or off-topic questions** get a clarifying question, or a short note on why the data can't
+  answer it, with tap-to-ask suggestions for what it *can* answer.
 
 ## How it works
 
@@ -84,7 +81,7 @@ researcher-1 researcher-2 researcher-3 researcher-4
            otherwise the Writer rewrites once · charts from the cited rows · Sources list
 ```
 
-Three details that make the answers trustworthy rather than just fluent:
+Three design choices keep the answers accurate:
 
 - **Fresh contexts, different angles.** Each Researcher sees only its own sub-question, so one
   Researcher's guess can't steer another. The Lead is told to cover different angles (what riders
@@ -132,8 +129,8 @@ trace records each agent's decisions: `plan`, `dispatch_researchers`, `report_fi
 
 ## Data
 
-Five public sources (more than one per team member), plus one table we built from them. None of it is
-something a language model knows: it's 2025–2026 data, and the new fares took effect after most models' training.
+Five public sources, plus one table we built from them. All of it covers 2025–2026, so the
+answers have to come from the data rather than from general knowledge.
 
 | Table | Source | Rows | What it adds |
 |---|---|---|---|
@@ -169,8 +166,7 @@ the fares and rebuild the spending table.
 - **Prices before August 2023**, and pre-2026 prices for zone pairs missing from the 2023 table.
 - **Individual riders.** Nobody is tracked across purchases, so "ten-trip buyers switched to X" is
   inferred from aggregate shares.
-- **Ticket counts are closer to rides than purchases**: a ten-trip counts as 10, and round trips mostly per leg.
-- **Onboard and device codes.** `OBTIM`/`TIM`/`STIM` aren't documented, and crowding data covers M7/M9 trains only.
+- **Crowding on every train.** Occupancy data covers M7/M9 electric trains only.
 - **Dates.** Ticket sales and crowding run from 2025-01-01 to 2026-09-30.
 - **Background facts.** The non-price changes (the ten-trip ended, the Day Pass was introduced) come from
   MTA announcements and are cited `[MTA announcement]`, not to a dataset.
@@ -257,7 +253,7 @@ tools and no system prompt. The expected answers come from SQL run directly on t
 
 </details>
 
-**Verdict:** The baseline can't answer at all. The agent finds the substitution (one-way plus Day Pass), checks it against ridership, and notes the counting quirk (a ten-trip is counted as 10 tickets).
+**Verdict:** The baseline can't answer at all. The agent finds the substitution (one-way plus Day Pass), and checks it against ridership to show riders switched tickets rather than leaving.
 
 ### 3. What riders spend
 
